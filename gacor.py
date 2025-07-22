@@ -1,60 +1,83 @@
-from utils.auth_handler import login_instagram
-from utils.comment_manager import load_comments, choose_comment
+from instagrapi import Client
 from utils.license_check import is_license_valid
 import json, time, os
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
 
-load_dotenv()
+def input_with_confirm(prompt):
+    while True:
+        value = input(prompt)
+        confirm = input(f"✅ Kamu yakin dengan: '{value}'? (y/n): ").lower()
+        if confirm == 'y':
+            return value
 
-IG_USERNAME = os.getenv("IG_USERNAME")
-IG_PASSWORD = os.getenv("IG_PASSWORD")
-LICENSE_KEY = os.getenv("LICENSE_KEY")
+# Login
+print("🔐 Login Instagram")
+username = input_with_confirm("Masukkan username IG: ")
+password = input_with_confirm("Masukkan password IG: ")
 
-# Cek lisensi
-if not is_license_valid(LICENSE_KEY):
+# Lisensi
+print("\n🧾 Cek Lisensi")
+license_key = input_with_confirm("Masukkan License Key: ")
+if not is_license_valid(license_key):
     print("❌ Lisensi tidak valid. Hubungi pembuat script.")
     exit()
 
-# Load daftar komentar
-comments = load_comments("comments.json")
+# Target
+print("\n🎯 Target Komentar")
+target_list = []
+while True:
+    target = input("➕ Tambah username target (tanpa @): ")
+    if target: target_list.append(target)
+    lanjut = input("Tambah lagi? (y/n): ").lower()
+    if lanjut != 'y':
+        break
 
-# Load daftar target username
-with open("targets.json", "r") as f:
-    targets = json.load(f)
+# Komentar
+print("\n💬 Isi Komentar")
+comment_list = []
+while True:
+    comment = input("➕ Tambah komentar: ")
+    if comment: comment_list.append(comment)
+    lanjut = input("Tambah komentar lagi? (y/n): ").lower()
+    if lanjut != 'y':
+        break
+
+# Jeda dan batas
+print("\n⏱️ Pengaturan Waktu")
+BATAS_DETIK = int(input("Batas detik postingan baru (misal 1): "))
+JEDA_CEK = int(input("Jeda cek tiap berapa detik (misal 1): "))
+JEDA_KOMEN = int(input("Tunggu berapa detik sebelum komentar (misal 30): "))
 
 # Login ke Instagram
-from instagrapi import Client
-cl = login_instagram(IG_USERNAME, IG_PASSWORD)
+cl = Client()
+cl.login(username, password)
 
-# Durasi maksimal postingan dianggap "baru" (dalam detik)
-BATAS_DETIK = 1  # ganti sesuai kebutuhanmu
+# Simpan history media_id yang sudah dikomen
+commented = set()
 
-# Loop ke semua target
-for username in targets:
-    try:
-        user_id = cl.user_id_from_username(username)
-        medias = cl.user_medias(user_id, 1)  # Ambil 1 postingan terbaru
+# Loop terus
+while True:
+    for target in target_list:
+        try:
+            user_id = cl.user_id_from_username(target)
+            medias = cl.user_medias(user_id, 1)
 
-        if medias:
-            media = medias[0]
-            timestamp = media.taken_at
-            sekarang = datetime.now()
-
-            if timestamp >= sekarang - timedelta(seconds=BATAS_DETIK):
-                media_id = media.id
-                comment = choose_comment(comments)
-
-                print(f"⏳ Menunggu 30 detik sebelum komentar ke @{username}...")
-                time.sleep(30)
-
-                cl.media_comment(media_id, comment)
-                print(f"✅ Komentar terkirim ke @{username}: {comment}")
+            if medias:
+                media = medias[0]
+                age_seconds = (time.time() - media.taken_at.timestamp())
+                if age_seconds <= BATAS_DETIK and media.id not in commented:
+                    comment = comment_list[0]  # Ambil komentar pertama atau random
+                    print(f"\n⏳ Menunggu {JEDA_KOMEN} detik sebelum komentar ke @{target}...")
+                    time.sleep(JEDA_KOMEN)
+                    cl.media_comment(media.id, comment)
+                    commented.add(media.id)
+                    print(f"✅ Komentar terkirim ke @{target}: {comment}")
+                else:
+                    print(f"⏭️ Postingan @{target} tidak baru ({int(age_seconds)}s lalu)")
             else:
-                print(f"⏭️ Postingan @{username} terlalu lama (upload: {timestamp}) — dilewati.")
+                print(f"⚠️ Tidak ada postingan dari @{target}")
 
-        else:
-            print(f"⚠️ Tidak ada postingan dari @{username}")
+        except Exception as e:
+            print(f"❌ Gagal komentar ke @{target}: {e}")
 
-    except Exception as e:
-        print(f"❌ Gagal komentar ke @{username}: {e}")
+    print(f"🔁 Menunggu {JEDA_CEK} detik sebelum pengecekan berikutnya...\n")
+    time.sleep(JEDA_CEK)
