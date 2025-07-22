@@ -1,83 +1,118 @@
 from instagrapi import Client
+import time, random
 from utils.license_check import is_license_valid
-import json, time, os
 
-def input_with_confirm(prompt):
+def input_list(prompt, separator=","):
+    print(f"{prompt} (pisahkan dengan '{separator}')")
+    return [i.strip() for i in input(">> ").split(separator) if i.strip()]
+
+def konfirmasi(data, nama_data):
+    print(f"\n📌 Konfirmasi {nama_data}:")
+    for i, d in enumerate(data, 1):
+        print(f"{i}. {d}")
     while True:
-        value = input(prompt)
-        confirm = input(f"✅ Kamu yakin dengan: '{value}'? (y/n): ").lower()
-        if confirm == 'y':
-            return value
+        lanjut = input("✅ Lanjut? (y = ya, r = ubah, x = keluar): ").lower()
+        if lanjut == "y":
+            return data
+        elif lanjut == "r":
+            return None
+        elif lanjut == "x":
+            print("❌ Dibatalkan.")
+            exit()
+        else:
+            print("⚠️ Pilih hanya: y / r / x")
 
-# Login
-print("🔐 Login Instagram")
-username = input_with_confirm("Masukkan username IG: ")
-password = input_with_confirm("Masukkan password IG: ")
+def login_instagram():
+    print("\n🔐 LOGIN INSTAGRAM")
+    username = input("Username: ")
+    password = input("Password: ")
+    print("⏳ Login...")
+    cl = Client()
+    try:
+        cl.login(username, password)
+        print("✅ Login berhasil!\n")
+        return cl
+    except Exception as e:
+        print(f"❌ Gagal login: {e}")
+        exit()
 
-# Lisensi
-print("\n🧾 Cek Lisensi")
-license_key = input_with_confirm("Masukkan License Key: ")
-if not is_license_valid(license_key):
-    print("❌ Lisensi tidak valid. Hubungi pembuat script.")
-    exit()
+def cek_lisensi():
+    print("🔑 CEK LISENSI")
+    lisensi = input("Masukkan kode lisensi: ")
+    if not is_license_valid(lisensi):
+        print("❌ Lisensi tidak valid.")
+        exit()
+    print("✅ Lisensi valid.\n")
 
-# Target
-print("\n🎯 Target Komentar")
-target_list = []
+# ===== MULAI SCRIPT =====
+print("===== AUTO KOMEN INSTAGRAM v2.0 =====")
+
+# Cek lisensi
+cek_lisensi()
+
+# Login IG
+cl = login_instagram()
+
+# Input target
 while True:
-    target = input("➕ Tambah username target (tanpa @): ")
-    if target: target_list.append(target)
-    lanjut = input("Tambah lagi? (y/n): ").lower()
-    if lanjut != 'y':
+    targets = input_list("Masukkan daftar target username (tanpa @, pisahkan dengan koma)", ",")
+    confirmed = konfirmasi(targets, "target")
+    if confirmed:
         break
 
-# Komentar
-print("\n💬 Isi Komentar")
-comment_list = []
+# Input komentar
 while True:
-    comment = input("➕ Tambah komentar: ")
-    if comment: comment_list.append(comment)
-    lanjut = input("Tambah komentar lagi? (y/n): ").lower()
-    if lanjut != 'y':
+    comments = input_list("Masukkan daftar komentar (pisahkan dengan '|')", "|")
+    confirmed = konfirmasi(comments, "komentar")
+    if confirmed:
         break
 
-# Jeda dan batas
-print("\n⏱️ Pengaturan Waktu")
-BATAS_DETIK = int(input("Batas detik postingan baru (misal 1): "))
-JEDA_CEK = int(input("Jeda cek tiap berapa detik (misal 1): "))
-JEDA_KOMEN = int(input("Tunggu berapa detik sebelum komentar (misal 30): "))
+# Menyimpan postingan yang akan dikomentari + waktu komentar
+pending_comments = {}
 
-# Login ke Instagram
-cl = Client()
-cl.login(username, password)
+print("\n🚀 AUTO KOMEN BERJALAN TIAP DETIK — hanya jika postingan baru (≤1 detik)\n")
 
-# Simpan history media_id yang sudah dikomen
-commented = set()
-
-# Loop terus
 while True:
-    for target in target_list:
-        try:
-            user_id = cl.user_id_from_username(target)
-            medias = cl.user_medias(user_id, 1)
+    try:
+        now = time.time()
+        # Periksa yang sudah masuk antrian komentar
+        to_remove = []
+        for media_id, (username, komentar, found_time) in pending_comments.items():
+            if now - found_time >= 30:
+                try:
+                    cl.media_comment(media_id, komentar)
+                    print(f"✅ KOMENTAR ke @{username}: {komentar}")
+                    to_remove.append(media_id)
+                except Exception as e:
+                    print(f"❌ Gagal komentar ke @{username}: {e}")
+                    to_remove.append(media_id)
+        for media_id in to_remove:
+            pending_comments.pop(media_id, None)
 
-            if medias:
-                media = medias[0]
-                age_seconds = (time.time() - media.taken_at.timestamp())
-                if age_seconds <= BATAS_DETIK and media.id not in commented:
-                    comment = comment_list[0]  # Ambil komentar pertama atau random
-                    print(f"\n⏳ Menunggu {JEDA_KOMEN} detik sebelum komentar ke @{target}...")
-                    time.sleep(JEDA_KOMEN)
-                    cl.media_comment(media.id, comment)
-                    commented.add(media.id)
-                    print(f"✅ Komentar terkirim ke @{target}: {comment}")
+        # Cek postingan baru
+        for username in targets:
+            try:
+                user_id = cl.user_id_from_username(username)
+                medias = cl.user_medias(user_id, 1)
+                if medias:
+                    media = medias[0]
+                    media_id = media.id
+                    umur_post = now - media.taken_at.timestamp()
+
+                    if media_id in pending_comments:
+                        continue
+
+                    if umur_post <= 1:
+                        komentar = random.choice(comments)
+                        print(f"🕐 Ditemukan postingan baru dari @{username} ({umur_post:.2f} detik lalu), komentar akan dikirim dalam 30 detik...")
+                        pending_comments[media_id] = (username, komentar, now)
+                    else:
+                        print(f"⏭️ @{username}: Postingan terlalu lama ({int(umur_post)} detik)")
                 else:
-                    print(f"⏭️ Postingan @{target} tidak baru ({int(age_seconds)}s lalu)")
-            else:
-                print(f"⚠️ Tidak ada postingan dari @{target}")
-
-        except Exception as e:
-            print(f"❌ Gagal komentar ke @{target}: {e}")
-
-    print(f"🔁 Menunggu {JEDA_CEK} detik sebelum pengecekan berikutnya...\n")
-    time.sleep(JEDA_CEK)
+                    print(f"⚠️ @{username}: Tidak ada postingan.")
+            except Exception as e:
+                print(f"❌ Error @{username}: {e}")
+        time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n🛑 Dihentikan oleh pengguna.")
+        break
