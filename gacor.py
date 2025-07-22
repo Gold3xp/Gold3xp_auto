@@ -115,4 +115,8 @@ while True:
         time.sleep(1)
     except KeyboardInterrupt:
         print("\n🛑 Dihentikan oleh pengguna.")
-        break
+        try:
+          cl.logout()
+        print("🔒 Berhasil logout dari Instagram.")
+    except Exception as e:
+        print(f"⚠️ Gagal logout: {e}")
