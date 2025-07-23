@@ -1,6 +1,7 @@
 from instagrapi import Client
 from colorama import Fore, init
-import time, random, json
+from dotenv import load_dotenv
+import os, time, random, json
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
@@ -24,33 +25,27 @@ def konfirmasi(data, nama_data):
         elif konfirmasi == "x":
             exit()
 
-def cek_season():
-    try:
-        with open("season.json") as f:
-            data = json.load(f)
-        if data.get("status", "").lower() != "active":
-            print(Fore.RED + "🔒 Season tidak aktif.")
-            exit()
-    except FileNotFoundError:
-        print(Fore.RED + "❌ File season.json tidak ditemukan.")
-        exit()
-
 def login_instagram():
-    try:
-        with open("session.json") as f:
-            session = json.load(f)
-    except FileNotFoundError:
-        print(Fore.RED + "❌ File session.json tidak ditemukan.")
+    load_dotenv()
+
+    username = os.getenv("IG_USERNAME")
+    password = os.getenv("IG_PASSWORD")
+
+    if not username or not password:
+        print(Fore.RED + "❌ Username atau password belum diatur di file .env")
         exit()
 
     cl = Client()
-    cl.login(session['username'], session['password'])
+    try:
+        cl.login(username, password)
+    except Exception as e:
+        print(Fore.RED + f"❌ Gagal login Instagram: {e}")
+        exit()
     return cl
 
 # === START ===
 clear_terminal()
 tampilkan_banner()
-cek_season()
 
 key = input("🔑 Masukkan lisensi key Anda: ")
 if not is_license_valid(key):
@@ -65,7 +60,6 @@ print(Fore.GREEN + "✅ Menjalankan auto-comment...")
 print(Fore.MAGENTA + "🚀 AUTO KOMEN BERJALAN – Deteksi semua postingan baru tanpa batas")
 
 last_commented_media = {}
-
 print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
 
 while True:
@@ -76,7 +70,6 @@ while True:
             media_id = media.id
             age = time.time() - media.taken_at.timestamp()
 
-            # Postingan baru dan belum dikomentari
             if media_id != last_commented_media.get(username) and age <= 31:
                 print(Fore.GREEN + f"\n✅ Postingan baru ditemukan dari @{username} (umur: {int(age)} detik)")
                 try:
@@ -89,6 +82,6 @@ while True:
         except Exception as e:
             print(Fore.RED + f"⚠️  Gagal memeriksa @{username}: {e}")
 
-    jeda = random.randint(4, 6)
+    jeda = random.randint(3, 6)
     print(Fore.YELLOW + f"\n🕒 Jeda {jeda} detik...")
     time.sleep(jeda)
