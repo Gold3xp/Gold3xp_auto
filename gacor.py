@@ -51,39 +51,38 @@ def cek_lisensi():
 
 def auto_comment_loop(cl, targets, comments):
     sudah_dikomentari = set()
-    print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
+    print("\n🚀 AUTO KOMEN BERJALAN — Deteksi semua postingan baru tanpa batas\n")
     try:
         while True:
             now = time.time()
             ada_post_baru = False
+
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
                     try:
-                        medias = cl.user_medias(user_id, amount=3)
+                        medias = cl.user_medias_v1(user_id, amount=5)
                     except:
                         medias = []
 
-                    if not medias:
-                        continue
+                    for media in medias:
+                        media_id = media.id
+                        umur_post = now - media.taken_at.timestamp()
 
-                    media = medias[0]
-                    media_id = media.id
-                    umur_post = now - media.taken_at.timestamp()
+                        if media_id in sudah_dikomentari:
+                            continue
 
-                    if media_id in sudah_dikomentari:
-                        continue
-
-                    if umur_post <= 31:
-                        print(Fore.GREEN + "✅ Postingan baru ditemukan! Mengirim komentar...")
-                        komentar = random.choice(comments)
-                        try:
-                            cl.media_comment(media_id, komentar)
-                            print(Fore.CYAN + "💬 Komentar terkirim")
-                            sudah_dikomentari.add(media_id)
-                            ada_post_baru = True
-                        except:
-                            print(Fore.RED + "❌ Gagal komentar")
+                        if umur_post <= 31:
+                            umur_detik = int(umur_post)
+                            print(Fore.GREEN + f"✅ Postingan baru ditemukan! @{username} ({umur_detik} detik lalu) — Mengirim komentar...")
+                            komentar = random.choice(comments)
+                            try:
+                                cl.media_comment(media_id, komentar)
+                                print(Fore.CYAN + "💬 Komentar terkirim")
+                                sudah_dikomentari.add(media_id)
+                                ada_post_baru = True
+                            except:
+                                print(Fore.RED + "❌ Gagal komentar")
                 except:
                     continue
 
