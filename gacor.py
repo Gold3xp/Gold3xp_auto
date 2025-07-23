@@ -50,47 +50,42 @@ def cek_lisensi():
     print("✅ Lisensi valid.\n")
 
 def auto_comment_loop(cl, targets, comments):
-    pending_comments = {}
-    print("\n🚀 AUTO KOMEN BERJALAN TIAP DETIK — hanya jika postingan baru (≤1 detik)\n")
+    sudah_dikomentari = set()
+    print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
     try:
         while True:
             now = time.time()
-            to_remove = []
-            for media_id, (username, komentar, found_time) in pending_comments.items():
-                if now - found_time >= 30:
-                    try:
-                        cl.media_comment(media_id, komentar)
-                        print(f"✅ KOMENTAR ke @{username}: {komentar}")
-                        to_remove.append(media_id)
-                    except Exception as e:
-                        print(f"❌ Gagal komentar ke @{username}: {e}")
-                        to_remove.append(media_id)
-            for media_id in to_remove:
-                pending_comments.pop(media_id, None)
-
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, 1)
-                    if medias:
-                        media = medias[0]
+                    medias = cl.user_medias(user_id, amount=3)
+                    if not medias:
+                        print(f"⚠️ @{username}: Tidak ada postingan.")
+                        continue
+
+                    for media in medias:
                         media_id = media.id
                         umur_post = now - media.taken_at.timestamp()
 
-                        if media_id in pending_comments:
+                        if media_id in sudah_dikomentari:
                             continue
 
-                        if umur_post <= 1:
+                        if umur_post <= <31:
                             komentar = random.choice(comments)
-                            print(f"🕐 @{username}: Postingan baru ({umur_post:.2f}s), komentar akan dikirim dalam 30 detik...")
-                            pending_comments[media_id] = (username, komentar, now)
+                            try:
+                                cl.media_comment(media_id, komentar)
+                                print(f"✅ KOMENTAR ke @{username}: {komentar} (umur: {int(umur_post)}s)")
+                                sudah_dikomentari.add(media_id)
+                            except Exception as e:
+                                print(f"❌ Gagal komentar ke @{username}: {e}")
                         else:
-                            print(f"⏭️ @{username}: Postingan terlalu lama ({int(umur_post)} detik)")
-                    else:
-                        print(f"⚠️ @{username}: Tidak ada postingan.")
+                            print(f"⏭️ @{username}: Postingan lama ({int(umur_post)}s) — dilewati.")
                 except Exception as e:
                     print(f"❌ Error @{username}: {e}")
-            time.sleep(1)
+
+            jeda = random.randint(3, 6)
+            print(f"⏳ Menunggu {jeda} detik...\n")
+            time.sleep(jeda)
     except KeyboardInterrupt:
         print("\n🛑 Dihentikan oleh pengguna.")
         try:
