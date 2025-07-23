@@ -1,11 +1,26 @@
 from instagrapi import Client
 from colorama import Fore, init
-import time, random
+import time, random, json
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
 
 init(autoreset=True)
+
+def cek_season():
+    try:
+        with open("season.json") as f:
+            data = json.load(f)
+        if data.get("status", "").lower() != "active":
+            print("❌ Season sedang tidak aktif. Program dihentikan.")
+            exit()
+        print(f"📅 Season: {data.get('season')} — Status: Aktif\n")
+    except FileNotFoundError:
+        print("❌ File season.json tidak ditemukan.")
+        exit()
+    except Exception as e:
+        print(f"❌ Terjadi kesalahan saat membaca season.json: {e}")
+        exit()
 
 def input_list(prompt, separator=","):
     print(f"{prompt} (pisahkan dengan '{separator}')")
@@ -116,6 +131,7 @@ def menu():
 def main():
     clear_terminal()
     tampilkan_banner()
+    cek_season()  # ← CEK SEASON AKTIF DULU
     cek_lisensi()
     cl = login_instagram()
 
