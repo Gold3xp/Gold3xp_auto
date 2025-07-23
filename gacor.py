@@ -1,26 +1,11 @@
 from instagrapi import Client
 from colorama import Fore, init
-import time, random, json
+import time, random
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
 
 init(autoreset=True)
-
-def cek_season():
-    try:
-        with open("season.json") as f:
-            data = json.load(f)
-        if data.get("status", "").lower() != "active":
-            print("❌ Season sedang tidak aktif. Program dihentikan.")
-            exit()
-        print(f"📅 Season: {data.get('season')} — Status: Aktif\n")
-    except FileNotFoundError:
-        print("❌ File season.json tidak ditemukan.")
-        exit()
-    except Exception as e:
-        print(f"❌ Terjadi kesalahan saat membaca season.json: {e}")
-        exit()
 
 def input_list(prompt, separator=","):
     print(f"{prompt} (pisahkan dengan '{separator}')")
@@ -43,15 +28,14 @@ def konfirmasi(data, nama_data):
             print("⚠️ Pilih hanya: y / r / x")
 
 def login_instagram():
-    print("\n🔐 LOGIN INSTAGRAM (manual)")
-    cl = Client()
+    print("\n🔐 LOGIN INSTAGRAM")
     username = input("Username: ")
     password = input("Password: ")
     print("⏳ Login...")
+    cl = Client()
     try:
         cl.login(username, password)
-        cl.dump_settings("session_log.json")  # Simpan riwayat login
-        print("✅ Login berhasil! Riwayat disimpan di session_log.json\n")
+        print("✅ Login berhasil!\n")
         return cl
     except Exception as e:
         print(f"❌ Gagal login: {e}")
@@ -75,14 +59,10 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-
-                    medias = []
                     try:
-                        medias = cl.user_medias(user_id, amount=3)
-                        if not isinstance(medias, list):
-                            medias = []
-                    except Exception:
-                        pass
+                        medias = cl.user_medias(user_id, amount=1)
+                    except:
+                        medias = []
 
                     if not medias:
                         continue
@@ -132,7 +112,6 @@ def menu():
 def main():
     clear_terminal()
     tampilkan_banner()
-    cek_season()
     cek_lisensi()
     cl = login_instagram()
 
