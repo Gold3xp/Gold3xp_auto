@@ -70,7 +70,7 @@ def auto_comment_loop(cl, targets, comments):
                         if media_id in sudah_dikomentari:
                             continue
 
-                        if umur_post <= <31:
+                        if umur_post <= 31:
                             komentar = random.choice(comments)
                             try:
                                 cl.media_comment(media_id, komentar)
