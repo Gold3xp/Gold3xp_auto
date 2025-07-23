@@ -1,6 +1,6 @@
 from instagrapi import Client
 from colorama import Fore, init
-import time, random, json
+import time, random, json, os
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
@@ -44,13 +44,28 @@ def konfirmasi(data, nama_data):
 
 def login_instagram():
     print("\n🔐 LOGIN INSTAGRAM")
+    cl = Client()
+    session_file = "season.json"
+
+    if os.path.exists(session_file):
+        print("🔄 Memuat sesi dari season.json...")
+        try:
+            with open(session_file, "r") as f:
+                settings = json.load(f)
+            cl.set_settings(settings)
+            cl.get_timeline_feed()
+            print("✅ Login berhasil dari sesi tersimpan!\n")
+            return cl
+        except Exception as e:
+            print(f"⚠️ Gagal login dari session: {e}")
+
     username = input("Username: ")
     password = input("Password: ")
     print("⏳ Login...")
-    cl = Client()
     try:
         cl.login(username, password)
-        print("✅ Login berhasil!\n")
+        cl.dump_settings(session_file)
+        print("✅ Login berhasil & sesi disimpan!\n")
         return cl
     except Exception as e:
         print(f"❌ Gagal login: {e}")
@@ -74,7 +89,6 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-
                     medias = []
                     try:
                         medias = cl.user_medias(user_id, amount=3)
@@ -131,7 +145,7 @@ def menu():
 def main():
     clear_terminal()
     tampilkan_banner()
-    cek_season()  # ← CEK SEASON AKTIF DULU
+    cek_season()
     cek_lisensi()
     cl = login_instagram()
 
