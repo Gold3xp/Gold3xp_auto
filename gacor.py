@@ -7,7 +7,7 @@ from utils.banner import tampilkan_banner
 
 init(autoreset=True)
 
-def input_list(prompt, separator="|"):
+def input_list(prompt, separator=","):
     print(f"{prompt} (pisahkan dengan '{separator}')")
     return [i.strip() for i in input(">> ").split(separator) if i.strip()]
 
@@ -16,69 +16,149 @@ def konfirmasi(data, nama_data):
     for i, d in enumerate(data, 1):
         print(f"{i}. {d}")
     while True:
-        konfirmasi = input(f"✅ Lanjut? (y = ya, r = ubah, x = keluar): ").lower()
-        if konfirmasi == "y":
+        lanjut = input("✅ Lanjut? (y = ya, r = ubah, x = keluar): ").lower()
+        if lanjut == "y":
             return data
-        elif konfirmasi == "r":
-            return input_list(f"Masukkan ulang {nama_data}")
-        elif konfirmasi == "x":
+        elif lanjut == "r":
+            return None
+        elif lanjut == "x":
+            print("❌ Dibatalkan.")
             exit()
+        else:
+            print("⚠️ Pilih hanya: y / r / x")
 
 def login_instagram():
-    username = input("👤 Masukkan username IG: ").strip()
-    password = input("🔑 Masukkan password IG: ").strip()
-
-    if not username or not password:
-        print(Fore.RED + "❌ Username atau password tidak boleh kosong!")
-        exit()
-
+    print("\n🔐 LOGIN INSTAGRAM")
+    username = input("Username: ")
+    password = input("Password: ")
+    print("⏳ Login...")
     cl = Client()
     try:
         cl.login(username, password)
+        print("✅ Login berhasil!\n")
+        return cl
     except Exception as e:
-        print(Fore.RED + f"❌ Gagal login Instagram: {e}")
+        print(f"❌ Gagal login: {e}")
         exit()
-    return cl
 
-# === START ===
-clear_terminal()
-tampilkan_banner()
+def cek_lisensi():
+    print("🔑 CEK LISENSI")
+    lisensi = input("Masukkan kode lisensi: ")
+    if not is_license_valid(lisensi):
+        print("❌ Lisensi tidak valid.")
+        exit()
+    print("✅ Lisensi valid.\n")
 
-key = input("🔑 Masukkan lisensi key Anda: ")
-if not is_license_valid(key):
-    print(Fore.RED + "❌ Lisensi tidak valid!")
-    exit()
-
-cl = login_instagram()
-targets = konfirmasi(input_list("Masukkan username target"), "target")
-comments = konfirmasi(input_list("Masukkan komentar"), "komentar")
-
-print(Fore.GREEN + "✅ Menjalankan auto-comment...")
-print(Fore.MAGENTA + "🚀 AUTO KOMEN BERJALAN – Deteksi semua postingan baru tanpa batas")
-
-last_commented_media = {}
-print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
-
-while True:
-    for username in targets:
-        try:
-            user_id = cl.user_id_from_username(username)
-            media = cl.user_medias(user_id, amount=1)[0]
-            media_id = media.id
-            age = time.time() - media.taken_at.timestamp()
-
-            if media_id != last_commented_media.get(username) and age <= 31:
-                print(Fore.GREEN + f"\n✅ Postingan baru ditemukan dari @{username} (umur: {int(age)} detik)")
+def auto_comment_loop(cl, targets, comments):
+    sudah_dikomentari = set()
+    print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
+    try:
+        while True:
+            now = time.time()
+            ada_post_baru = False
+            for username in targets:
                 try:
-                    komentar = random.choice(comments)
-                    cl.media_comment(media_id, komentar)
-                    last_commented_media[username] = media_id
-                    print(Fore.CYAN + "💬 Komentar terkirim")
-                except Exception as e:
-                    print(Fore.RED + f"❌ Gagal komentar: {e}")
-        except Exception as e:
-            print(Fore.RED + f"⚠️  Gagal memeriksa @{username}: {e}")
+                    user_id = cl.user_id_from_username(username)
 
-    jeda = random.randint(4, 6)
-    print(Fore.YELLOW + f"\n🕒 Jeda {jeda} detik...")
-    time.sleep(jeda)
+                    medias = []
+                    try:
+                        medias = cl.user_medias(user_id, amount=1)
+                        if not isinstance(medias, list):
+                            medias = []
+                    except Exception:
+                        pass
+
+                    if not medias:
+                        continue
+
+                    media = medias[0]
+                    media_id = media.id
+                    umur_post = now - media.taken_at.timestamp()
+
+                    if media_id in sudah_dikomentari:
+                        continue
+
+                    if umur_post <= 31:
+                        print(Fore.GREEN + "✅ Postingan baru ditemukan! Mengirim komentar...")
+                        komentar = random.choice(comments)
+                        try:
+                            cl.media_comment(media_id, komentar)
+                            print(Fore.CYAN + "💬 Komentar terkirim")
+                            sudah_dikomentari.add(media_id)
+                            ada_post_baru = True
+                        except:
+                            print(Fore.RED + "❌ Gagal komentar")
+                except:
+                    continue
+
+            if not ada_post_baru:
+                print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+
+            jeda = random.randint(3, 6)
+            print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
+            time.sleep(jeda)
+
+    except KeyboardInterrupt:
+        print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
+        try:
+            cl.logout()
+            print(Fore.GREEN + "🔒 Logout berhasil.")
+        except:
+            print(Fore.RED + "⚠️ Gagal logout.")
+
+def menu():
+    print(Fore.CYAN + "\n==== MENU ====")
+    print("1. Jalankan auto-comment")
+    print("2. Logout Instagram")
+    print("3. Keluar")
+    return input("Pilih menu: ")
+
+def main():
+    clear_terminal()
+    tampilkan_banner()
+    cek_lisensi()
+    cl = login_instagram()
+
+    while True:
+        clear_terminal()
+        tampilkan_banner()
+        pilihan = menu()
+
+        if pilihan == "1":
+            clear_terminal()
+            tampilkan_banner()
+            while True:
+                targets = input_list("Masukkan daftar target username (tanpa @, pisahkan dengan koma)", ",")
+                confirmed = konfirmasi(targets, "target")
+                if confirmed:
+                    break
+
+            while True:
+                comments = input_list("Masukkan daftar komentar (pisahkan dengan '|')", "|")
+                confirmed = konfirmasi(comments, "komentar")
+                if confirmed:
+                    break
+
+            print(Fore.GREEN + "\n▶️ Menjalankan auto-comment...\n")
+            auto_comment_loop(cl, targets, comments)
+
+        elif pilihan == "2":
+            clear_terminal()
+            tampilkan_banner()
+            try:
+                cl.logout()
+                print(Fore.GREEN + "✅ Berhasil logout.\n")
+            except:
+                print(Fore.RED + "❌ Logout gagal.\n")
+            input("Tekan Enter untuk kembali...")
+
+        elif pilihan == "3":
+            print(Fore.CYAN + "\n👋 Keluar...")
+            break
+
+        else:
+            print(Fore.RED + "\n❌ Pilihan tidak valid!")
+            input("Tekan Enter untuk kembali...")
+
+if __name__ == "__main__":
+    main()
