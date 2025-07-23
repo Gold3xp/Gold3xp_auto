@@ -43,14 +43,15 @@ def konfirmasi(data, nama_data):
             print("⚠️ Pilih hanya: y / r / x")
 
 def login_instagram():
-    print("\n🔐 LOGIN INSTAGRAM")
+    print("\n🔐 LOGIN INSTAGRAM (manual)")
+    cl = Client()
     username = input("Username: ")
     password = input("Password: ")
     print("⏳ Login...")
-    cl = Client()
     try:
         cl.login(username, password)
-        print("✅ Login berhasil!\n")
+        cl.dump_settings("session_log.json")  # Simpan riwayat login
+        print("✅ Login berhasil! Riwayat disimpan di session_log.json\n")
         return cl
     except Exception as e:
         print(f"❌ Gagal login: {e}")
@@ -131,7 +132,7 @@ def menu():
 def main():
     clear_terminal()
     tampilkan_banner()
-    cek_season()  # ← CEK SEASON AKTIF DULU
+    cek_season()
     cek_lisensi()
     cl = login_instagram()
 
