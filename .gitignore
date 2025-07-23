@@ -1,5 +1,6 @@
 .env
+season.json
+session_log.json
 __pycache__/
 *.pyc
 valid_keys.txt
-season.json
