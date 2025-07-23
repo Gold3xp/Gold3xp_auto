@@ -2,5 +2,3 @@
 __pycache__/
 *.pyc
 valid_keys.txt
-season.json
-session_log.json
