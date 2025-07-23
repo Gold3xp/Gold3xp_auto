@@ -71,28 +71,32 @@ def auto_comment_loop(cl, targets, comments):
                             continue
 
                         if umur_post <= 31:
-                            komentar = random.choice(comments)
-                            try:
-                                cl.media_comment(media_id, komentar)
-                                print(f"✅ KOMENTAR ke @{username}: {komentar} (umur: {int(umur_post)}s)")
-                                sudah_dikomentari.add(media_id)
-                            except Exception as e:
-                                print(f"❌ Gagal komentar ke @{username}: {e}")
-                        else:
-                            print(f"⏭️ @{username}: Postingan lama ({int(umur_post)}s) — dilewati.")
+                            print(Fore.GREEN + f"✅ Postingan baru dari @{username} (umur: {int(umur_post)}s)")
+                        komentar = random.choice(comments)
+                        try:
+                            cl.media_comment(media_id, komentar)
+                            print(Fore.CYAN + f"💬 Komentar terkirim: {komentar}")
+                            sudah_dikomentari.add(media_id)
+                            ada_post_baru = True
+                        except Exception as e:
+                            print(Fore.RED + f"❌ Gagal komentar ke @{username}: {e}")
                 except Exception as e:
-                    print(f"❌ Error @{username}: {e}")
+                    print(Fore.RED + f"❌ Error @{username}: {e}")
+
+            if not ada_post_baru:
+                print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
 
             jeda = random.randint(3, 6)
-            print(f"⏳ Menunggu {jeda} detik...\n")
+            print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
             time.sleep(jeda)
+
     except KeyboardInterrupt:
-        print("\n🛑 Dihentikan oleh pengguna.")
+        print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
         try:
             cl.logout()
-            print("🔒 Berhasil logout dari Instagram.")
+            print(Fore.GREEN + "🔒 Logout berhasil.")
         except:
-            print("⚠️ Gagal logout.")
+            print(Fore.RED + "⚠️ Gagal logout.")
 
 def menu():
     print(Fore.CYAN + "\n==== MENU ====")
