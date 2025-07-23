@@ -71,32 +71,28 @@ def auto_comment_loop(cl, targets, comments):
                             continue
 
                         if umur_post <= 31:
-                            print(Fore.GREEN + f"✅ Postingan baru dari @{username} (umur: {int(umur_post)}s)")
-                        komentar = random.choice(comments)
-                        try:
-                            cl.media_comment(media_id, komentar)
-                            print(Fore.CYAN + f"💬 Komentar terkirim: {komentar}")
-                            sudah_dikomentari.add(media_id)
-                            ada_post_baru = True
-                        except Exception as e:
-                            print(Fore.RED + f"❌ Gagal komentar ke @{username}: {e}")
+                            komentar = random.choice(comments)
+                            try:
+                                cl.media_comment(media_id, komentar)
+                                print(f"✅ KOMENTAR ke @{username}: {komentar} (umur: {int(umur_post)}s)")
+                                sudah_dikomentari.add(media_id)
+                            except Exception as e:
+                                print(f"❌ Gagal komentar ke @{username}: {e}")
+                        else:
+                            print(f"⏭️ @{username}: Postingan lama ({int(umur_post)}s) — dilewati.")
                 except Exception as e:
-                    print(Fore.RED + f"❌ Error @{username}: {e}")
-
-            if not ada_post_baru:
-                print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+                    print(f"❌ Error @{username}: {e}")
 
             jeda = random.randint(3, 6)
-            print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
+            print(f"⏳ Menunggu {jeda} detik...\n")
             time.sleep(jeda)
-
     except KeyboardInterrupt:
-        print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
+        print("\n🛑 Dihentikan oleh pengguna.")
         try:
             cl.logout()
-            print(Fore.GREEN + "🔒 Logout berhasil.")
+            print("🔒 Berhasil logout dari Instagram.")
         except:
-            print(Fore.RED + "⚠️ Gagal logout.")
+            print("⚠️ Gagal logout.")
 
 def menu():
     print(Fore.CYAN + "\n==== MENU ====")
@@ -124,8 +120,7 @@ def main():
                 confirmed = konfirmasi(targets, "target")
                 if confirmed:
                     break
-
-            while True:
+                    while True:
                 comments = input_list("Masukkan daftar komentar (pisahkan dengan '|')", "|")
                 confirmed = konfirmasi(comments, "komentar")
                 if confirmed:
@@ -152,5 +147,5 @@ def main():
             print(Fore.RED + "\n❌ Pilihan tidak valid!")
             input("Tekan Enter untuk kembali...")
 
-if __name__ == "__main__":
+if name == "main":
     main()
