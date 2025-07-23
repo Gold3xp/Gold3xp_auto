@@ -1,7 +1,6 @@
 from instagrapi import Client
 from colorama import Fore, init
-from dotenv import load_dotenv
-import os, time, random, json
+import time, random
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
@@ -26,13 +25,11 @@ def konfirmasi(data, nama_data):
             exit()
 
 def login_instagram():
-    load_dotenv()
-
-    username = os.getenv("IG_USERNAME")
-    password = os.getenv("IG_PASSWORD")
+    username = input("👤 Masukkan username IG: ").strip()
+    password = input("🔑 Masukkan password IG: ").strip()
 
     if not username or not password:
-        print(Fore.RED + "❌ Username atau password belum diatur di file .env")
+        print(Fore.RED + "❌ Username atau password tidak boleh kosong!")
         exit()
 
     cl = Client()
@@ -82,6 +79,6 @@ while True:
         except Exception as e:
             print(Fore.RED + f"⚠️  Gagal memeriksa @{username}: {e}")
 
-    jeda = random.randint(3, 6)
+    jeda = random.randint(4, 6)
     print(Fore.YELLOW + f"\n🕒 Jeda {jeda} detik...")
     time.sleep(jeda)
