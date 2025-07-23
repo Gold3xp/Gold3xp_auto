@@ -60,7 +60,7 @@ def auto_comment_loop(cl, targets, comments):
                 try:
                     user_id = cl.user_id_from_username(username)
                     try:
-                        medias = cl.user_medias(user_id, amount=1)
+                        medias = cl.user_medias(user_id, amount=3)
                     except:
                         medias = []
 
