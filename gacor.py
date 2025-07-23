@@ -1,3 +1,5 @@
+import requests
+from bs4 import BeautifulSoup
 from instagrapi import Client
 from colorama import Fore, init
 import time, random
@@ -27,18 +29,76 @@ def konfirmasi(data, nama_data):
         else:
             print("⚠️ Pilih hanya: y / r / x")
 
+def ambil_proxy_gratis():
+    print(Fore.YELLOW + "🌐 Mengambil proxy gratis dari internet...")
+    try:
+        res = requests.get("https://free-proxy-list.net/", timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        proxies = []
+
+        for row in soup.select("table#proxylisttable tbody tr"):
+            cols = row.find_all("td")
+            if cols[6].text == "yes":  # Hanya HTTPS
+                ip = cols[0].text
+                port = cols[1].text
+                proxies.append(f"http://{ip}:{port}")
+
+        print(Fore.GREEN + f"✅ Ditemukan {len(proxies)} proxy.")
+        return proxies
+    except Exception as e:
+        print(Fore.RED + f"❌ Gagal mengambil proxy: {e}")
+        return []
+
+def tes_proxy(proxy):
+    try:
+        res = requests.get("http://httpbin.org/ip", proxies={"http": proxy, "https": proxy}, timeout=5)
+        if res.status_code == 200:
+            return True
+    except:
+        return False
+    return False
+
 def login_instagram():
     print("\n🔐 LOGIN INSTAGRAM")
     username = input("Username: ")
     password = input("Password: ")
+
+    print("\nPilih metode proxy:")
+    print("1. Manual")
+    print("2. Otomatis dari proxy gratis")
+    print("3. Tanpa proxy")
+    pilihan = input("Pilihan (1/2/3): ").strip()
+
+    proxy = ""
+    if pilihan == "1":
+        proxy = input("Masukkan proxy (contoh: http://user:pass@ip:port): ").strip()
+    elif pilihan == "2":
+        daftar_proxy = ambil_proxy_gratis()
+        for p in daftar_proxy:
+            print(Fore.YELLOW + f"🔍 Menguji proxy: {p}")
+            if tes_proxy(p):
+                proxy = p
+                print(Fore.GREEN + f"✅ Proxy aktif: {proxy}")
+                break
+        if not proxy:
+            print(Fore.RED + "❌ Tidak ada proxy gratis yang aktif. Lanjut tanpa proxy.")
+    elif pilihan == "3":
+        print(Fore.YELLOW + "🌐 Tidak menggunakan proxy")
+    else:
+        print(Fore.RED + "❌ Pilihan tidak valid.")
+        exit()
+
     print("⏳ Login...")
     cl = Client()
+    if proxy:
+        cl.set_proxy(proxy)
+
     try:
         cl.login(username, password)
-        print("✅ Login berhasil!\n")
+        print(Fore.GREEN + "✅ Login berhasil!\n")
         return cl
     except Exception as e:
-        print(f"❌ Gagal login: {e}")
+        print(Fore.RED + f"❌ Gagal login: {e}")
         exit()
 
 def cek_lisensi():
@@ -62,7 +122,6 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-
                     medias = cl.user_medias(user_id, amount=10)
                     if not isinstance(medias, list) or not medias:
                         continue
