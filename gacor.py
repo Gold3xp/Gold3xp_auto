@@ -52,23 +52,19 @@ def cek_lisensi():
 def auto_comment_loop(cl, targets, comments):
     sudah_dikomentari = set()
     print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
+
+    sudah_print_menunggu = False
     try:
         while True:
             now = time.time()
             ada_post_baru = False
+
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
 
-                    medias = []
-                    try:
-                        medias = cl.user_medias(user_id, amount=1)
-                        if not isinstance(medias, list):
-                            medias = []
-                    except Exception:
-                        pass
-
-                    if not medias:
+                    medias = cl.user_medias(user_id, amount=10)
+                    if not isinstance(medias, list) or not medias:
                         continue
 
                     media = medias[0]
@@ -79,7 +75,7 @@ def auto_comment_loop(cl, targets, comments):
                         continue
 
                     if umur_post <= 31:
-                        print(Fore.GREEN + "✅ Postingan baru ditemukan! Mengirim komentar...")
+                        print(Fore.GREEN + f"✅ Postingan baru ditemukan! Mengirim komentar.. (user: {username}, umur: {int(umur_post)} detik)")
                         komentar = random.choice(comments)
                         try:
                             cl.media_comment(media_id, komentar)
@@ -92,7 +88,11 @@ def auto_comment_loop(cl, targets, comments):
                     continue
 
             if not ada_post_baru:
-                print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+                if not sudah_print_menunggu:
+                    print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+                    sudah_print_menunggu = True
+            else:
+                sudah_print_menunggu = False
 
             jeda = random.randint(3, 6)
             print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
