@@ -52,7 +52,9 @@ clear_terminal()
 tampilkan_banner()
 cek_season()
 
-if not is_license_valid():
+key = input("🔑 Masukkan lisensi key Anda: ")
+if not is_license_valid(key):
+    print(Fore.RED + "❌ Lisensi tidak valid!")
     exit()
 
 cl = login_instagram()
