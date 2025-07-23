@@ -62,7 +62,6 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-
                     medias = cl.user_medias(user_id, amount=1)
                     if not isinstance(medias, list) or not medias:
                         continue
@@ -91,12 +90,12 @@ def auto_comment_loop(cl, targets, comments):
                 if not sudah_print_menunggu:
                     print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
                     sudah_print_menunggu = True
+                time.sleep(0.8)
             else:
                 sudah_print_menunggu = False
-
-            jeda = random.randint(3, 6)
-            print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
-            time.sleep(jeda)
+                jeda = random.randint(3, 6)
+                print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
+                time.sleep(jeda)
 
     except KeyboardInterrupt:
         print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
