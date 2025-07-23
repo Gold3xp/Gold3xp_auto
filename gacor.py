@@ -59,30 +59,33 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=3)
+                    try:
+                        medias = cl.user_medias(user_id, amount=3)
+                    except:
+                        medias = []
+
                     if not medias:
-                        print(f"⚠️ @{username}: Tidak ada postingan.")
                         continue
 
-                    for media in medias:
-                        media_id = media.id
-                        umur_post = now - media.taken_at.timestamp()
+                    media = medias[0]
+                    media_id = media.id
+                    umur_post = now - media.taken_at.timestamp()
 
-                        if media_id in sudah_dikomentari:
-                            continue
+                    if media_id in sudah_dikomentari:
+                        continue
 
-                        if umur_post <= 31:
-                            print(Fore.GREEN + f"✅ Postingan baru dari @{username} (umur: {int(umur_post)}s)")
-                            komentar = random.choice(comments)
-                            try:
-                                cl.media_comment(media_id, komentar)
-                                print(Fore.CYAN + f"💬 Komentar terkirim: {komentar}")
-                                sudah_dikomentari.add(media_id)
-                                ada_post_baru = True
-                            except Exception as e:
-                                print(Fore.RED + f"❌ Gagal komentar ke @{username}: {e}")
-                except Exception as e:
-                    print(Fore.RED + f"❌ Error @{username}: {e}")
+                    if umur_post <= 31:
+                        print(Fore.GREEN + "✅ Postingan baru ditemukan! Mengirim komentar...")
+                        komentar = random.choice(comments)
+                        try:
+                            cl.media_comment(media_id, komentar)
+                            print(Fore.CYAN + "💬 Komentar terkirim")
+                            sudah_dikomentari.add(media_id)
+                            ada_post_baru = True
+                        except:
+                            print(Fore.RED + "❌ Gagal komentar")
+                except:
+                    continue
 
             if not ada_post_baru:
                 print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
