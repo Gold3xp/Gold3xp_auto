@@ -62,7 +62,7 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=5)
+                    medias = cl.user_medias(user_id, amount=10)
                     if not isinstance(medias, list) or not medias:
                         continue
 
