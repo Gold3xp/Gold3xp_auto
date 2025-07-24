@@ -62,7 +62,7 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=1)
+                    medias = cl.user_medias(user_id, amount=5)
                     if not isinstance(medias, list) or not medias:
                         continue
 
@@ -73,7 +73,7 @@ def auto_comment_loop(cl, targets, comments):
                     if media_id in sudah_dikomentari:
                         continue
 
-                    if umur_post <= 31:
+                    if 30 <= umur_post < 32:
                         print(Fore.GREEN + f"✅ Postingan baru ditemukan! Mengirim komentar.. (user: {username}, umur: {int(umur_post)} detik)")
                         komentar = random.choice(comments)
                         try:
