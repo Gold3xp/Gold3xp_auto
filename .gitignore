@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 valid_keys.txt
+cookie.txt
+user.txt
