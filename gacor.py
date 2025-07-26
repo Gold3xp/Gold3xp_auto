@@ -1,12 +1,14 @@
 from instagrapi import Client
+from instagrapi.exceptions import ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes
 from colorama import Fore, init
-import time, random
+import time, random, os, sys
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
 
 init(autoreset=True)
 
+# Fungsi bantu
 def input_list(prompt, separator=","):
     print(f"{prompt} (pisahkan dengan '{separator}')")
     return [i.strip() for i in input(">> ").split(separator) if i.strip()]
@@ -27,18 +29,49 @@ def konfirmasi(data, nama_data):
         else:
             print("⚠️ Pilih hanya: y / r / x")
 
-def login_instagram():
-    print("\n🔐 LOGIN INSTAGRAM")
-    username = input("Username: ")
-    password = input("Password: ")
-    print("⏳ Login...")
+# Ambil proxy dari file
+def get_proxy():
+    proxies = []
+    for file in ['Proxy.txt', 'Proxy2.txt']:
+        if os.path.exists(file):
+            with open(file) as f:
+                proxies += [p.strip() for p in f if p.strip()]
+    return random.choice(proxies) if proxies else None
+
+# Ambil user-agent dari file
+def get_user_agent():
+    uas = []
+    for file in ['Ua.txt', 'User-agents.txt']:
+        if os.path.exists(file):
+            with open(file) as f:
+                uas += [ua.strip() for ua in f if ua.strip()]
+    return random.choice(uas) if uas else "Mozilla/5.0 (Android 12; Mobile)"
+
+# Login dengan cookie
+def login_dengan_cookie():
+    print("\n🔐 LOGIN DENGAN COOKIE")
+    try:
+        with open("cookie.txt") as f:
+            sessionid = f.read().strip()
+        with open("user.txt") as f:
+            username = f.read().strip()
+    except:
+        print(Fore.RED + "❌ Gagal membaca cookie.txt atau user.txt")
+        exit()
+
     cl = Client()
     try:
-        cl.login(username, password)
-        print("✅ Login berhasil!\n")
+        proxy = get_proxy()
+        if proxy:
+            cl.set_proxy(proxy)
+
+        cl.headers.update({"User-Agent": get_user_agent()})
+        cl.login_by_sessionid(sessionid)
+        cl.get_timeline_feed()
+        print(Fore.GREEN + f"✅ Login berhasil sebagai {username}\n")
         return cl
     except Exception as e:
-        print(f"❌ Gagal login: {e}")
+        print(Fore.RED + f"❌ Gagal login dengan cookie: {e}")
         exit()
 
 def cek_lisensi():
@@ -52,7 +85,6 @@ def cek_lisensi():
 def auto_comment_loop(cl, targets, comments):
     sudah_dikomentari = set()
     print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
-
     sudah_print_menunggu = False
     try:
         while True:
@@ -62,27 +94,30 @@ def auto_comment_loop(cl, targets, comments):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=10)
-                    if not isinstance(medias, list) or not medias:
+                    medias = cl.user_medias(user_id, amount=1)
+                    if not medias:
                         continue
 
                     media = medias[0]
                     media_id = media.id
-                    umur_post = now - media.taken_at.timestamp()
+                    umur = now - media.taken_at.timestamp()
 
                     if media_id in sudah_dikomentari:
                         continue
 
-                    if 30 <= umur_post < 32:
-                        print(Fore.GREEN + f"✅ Postingan baru ditemukan! Mengirim komentar.. (user: {username}, umur: {int(umur_post)} detik)")
+                    if 30 <= umur < 32:
+                        print(Fore.GREEN + f"✅ Postingan baru ditemukan! (user: {username}, umur: {int(umur)} detik)")
                         komentar = random.choice(comments)
                         try:
                             cl.media_comment(media_id, komentar)
                             print(Fore.CYAN + "💬 Komentar terkirim")
                             sudah_dikomentari.add(media_id)
                             ada_post_baru = True
-                        except:
-                            print(Fore.RED + "❌ Gagal komentar")
+                        except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
+                            print(Fore.RED + "🚫 Akun dibatasi Instagram. Berhenti otomatis.")
+                            return
+                        except Exception as e:
+                            print(Fore.RED + f"❌ Gagal komentar: {e}")
                 except:
                     continue
 
@@ -96,9 +131,11 @@ def auto_comment_loop(cl, targets, comments):
                 jeda = random.randint(3, 6)
                 print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
                 time.sleep(jeda)
-
     except KeyboardInterrupt:
         print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
+    except Exception as e:
+        print(Fore.RED + f"\n⚠️ Terjadi kesalahan: {e}")
+    finally:
         try:
             cl.logout()
             print(Fore.GREEN + "🔒 Logout berhasil.")
@@ -116,7 +153,7 @@ def main():
     clear_terminal()
     tampilkan_banner()
     cek_lisensi()
-    cl = login_instagram()
+    cl = login_dengan_cookie()
 
     while True:
         clear_terminal()
@@ -140,6 +177,7 @@ def main():
 
             print(Fore.GREEN + "\n▶️ Menjalankan auto-comment...\n")
             auto_comment_loop(cl, targets, comments)
+            input(Fore.YELLOW + "\nTekan Enter untuk kembali ke menu...")
 
         elif pilihan == "2":
             clear_terminal()
