@@ -83,7 +83,7 @@ def login_dengan_cookie(path):
         if proxy:
             cl.set_proxy(proxy)
         if ua:
-            cl.headers.update({
+            cl.set_default_headers({
                 "User-Agent": ua,
                 "X-IG-App-ID": "936619743392459"
             })
