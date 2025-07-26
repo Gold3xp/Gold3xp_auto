@@ -82,7 +82,10 @@ def login_dengan_cookie(path):
     if proxy:
         cl.set_proxy(proxy)
     if ua:
-        cl.request.headers["User-Agent"] = ua
+        cl.headers = {
+            "User-Agent": ua,
+            "X-IG-App-ID": "936619743392459"
+        }
 
     try:
         cl.login_by_sessionid(sessionid)
