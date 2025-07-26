@@ -1,2 +1,2 @@
 instagrapi==1.15.4
-colorama
+colorama==0.4.6
