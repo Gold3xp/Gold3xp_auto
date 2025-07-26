@@ -70,7 +70,7 @@ def auto_comment_loop(cl, targets, comments, dummy_mode=False):
             for username in targets:
                 try:
                     user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=1)
+                    medias = cl.user_medias(user_id, amount=10)
                     if not medias:
                         continue
 
@@ -101,7 +101,7 @@ def auto_comment_loop(cl, targets, comments, dummy_mode=False):
                 if not sudah_print_menunggu:
                     print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
                     sudah_print_menunggu = True
-                time.sleep(0.8)
+                time.sleep(1)
             else:
                 sudah_print_menunggu = False
                 jeda = random.randint(3, 6)
