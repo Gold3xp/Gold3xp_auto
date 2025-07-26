@@ -10,14 +10,12 @@ init(autoreset=True)
 
 def load_file_lines(path):
     if not os.path.exists(path):
-        print(Fore.RED + f"❌ File tidak ditemukan: {path}")
         return []
-    lines = [line.strip() for line in open(path) if line.strip()]
-    if not lines:
-        print(Fore.RED + f"❌ File kosong: {path}")
-    return lines
+    return [line.strip() for line in open(path) if line.strip()]
 
 def load_accounts(folder='Data'):
+    if not os.path.exists(folder):
+        return []
     return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
             if os.path.isdir(os.path.join(folder, n))]
 
@@ -53,7 +51,7 @@ def login_dengan_cookie(account_path):
         print(Fore.YELLOW + f"⚠️ Proxy tidak valid: {proxy}")
         proxy = None
 
-    print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy} | UA: {ua}")
+    print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
 
     cl = Client()
     if proxy: cl.set_proxy(proxy)
@@ -78,7 +76,7 @@ def auto_comment_loop(cl, targets, comments):
 
         for target in targets:
             try:
-                uid = cl.user_id_from_username(target)
+                uid = cl.user_id_from_username(target.strip())
                 media = cl.user_medias(uid, 1)
                 if not media:
                     continue
@@ -88,15 +86,15 @@ def auto_comment_loop(cl, targets, comments):
                 if m.id in posted or umur < 30 or umur >= 32:
                     continue
 
-                print(Fore.GREEN + f"✅ Postingan baru dari @{target} — umur: {int(umur)} detik")
-                msg = random.choice(comments)
+                print(Fore.GREEN + f"✅ Postingan baru dari @{target.strip()} — umur: {int(umur)} detik")
+                msg = random.choice(comments).strip()
                 try:
                     cl.media_comment(m.id, msg)
                     print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim ({int(umur)}s)")
                     posted.add(m.id)
                     found = True
                 except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
-                    print(Fore.RED + "🚫 Akun limit/dibatasi. Beralih ke akun lain.")
+                    print(Fore.RED + "🚫 Akun dibatasi. Pindah akun.")
                     return False
                 except Exception as e:
                     print(Fore.RED + f"❌ Gagal komentar: {e}")
@@ -120,7 +118,7 @@ def main():
 
     accounts = load_accounts('Data')
     if not accounts:
-        print(Fore.RED + "❌ Folder akun tidak ditemukan di /Data.")
+        print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
         return
 
     targets = []
