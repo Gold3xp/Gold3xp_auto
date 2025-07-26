@@ -1,10 +1,10 @@
+import os, sys, random, time, requests
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes
 from colorama import Fore, init
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
-import os, sys, random, time
 
 init(autoreset=True)
 
@@ -12,6 +12,27 @@ def load_file_lines(path):
     if not os.path.exists(path):
         return []
     return [line.strip() for line in open(path) if line.strip()]
+
+def cek_proxy(proxy, ua):
+    try:
+        response = requests.get(
+            "https://www.instagram.com/",
+            proxies={"http": proxy, "https": proxy},
+            headers={"User-Agent": ua},
+            timeout=5
+        )
+        return response.status_code == 200
+    except:
+        return False
+
+def pilih_kombinasi_valid(proxies, uas):
+    random.shuffle(proxies)
+    random.shuffle(uas)
+    for proxy in proxies:
+        for ua in uas:
+            if cek_proxy(proxy, ua):
+                return proxy, ua
+    return None, None
 
 def load_accounts(folder='Data'):
     if not os.path.exists(folder):
@@ -44,23 +65,20 @@ def login_dengan_cookie(account_path):
     for f in ua_files:
         uas += load_file_lines(os.path.join(account_path, f))
 
-    proxy = random.choice(proxies) if proxies else None
-    ua = random.choice(uas) if uas else None
-
-    if proxy and not proxy.startswith("http"):
-        print(Fore.YELLOW + f"⚠️ Proxy tidak valid: {proxy}")
-        proxy = None
+    proxy, ua = pilih_kombinasi_valid(proxies, uas)
 
     print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
 
     cl = Client()
-    if proxy: cl.set_proxy(proxy)
-    if ua: cl.headers.update({'User-Agent': ua})
+    if proxy:
+        cl.set_proxy(proxy)
+    if ua:
+        cl.headers.update({'User-Agent': ua})
 
     try:
         cl.login_by_sessionid(sessionid)
         cl.get_timeline_feed()
-        cl.username_login = username  # simpan nama user untuk log
+        cl.username_login = username
         print(Fore.GREEN + f"✅ Login berhasil: {username}\n")
         return cl
     except Exception as e:
