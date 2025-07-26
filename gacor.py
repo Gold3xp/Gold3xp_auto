@@ -1,4 +1,8 @@
-import os, sys, random, time, requests
+import os
+import sys
+import time
+import random
+import requests
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes
 from colorama import Fore, init
@@ -64,7 +68,6 @@ def login_dengan_cookie(path):
         print(Fore.RED + f"❌ sessionid atau username kosong di {path}")
         return None
 
-    # Load proxy & user-agent
     proxy_files = ['Proxy.txt', 'Proxy2.txt']
     ua_files = ['Ua.txt', 'User-agents.txt']
     proxies, uas = [], []
@@ -78,15 +81,14 @@ def login_dengan_cookie(path):
 
     print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
 
+    if ua:
+        os.environ["IG_USER_AGENT"] = ua
+    os.environ["IG_APP_ID"] = "936619743392459"
+
     cl = Client()
     try:
         if proxy:
             cl.set_proxy(proxy)
-        if ua:
-            cl.set_default_headers({
-                "User-Agent": ua,
-                "X-IG-App-ID": "936619743392459"
-            })
 
         cl.login_by_sessionid(sessionid)
         user_info = cl.account_info()
