@@ -49,19 +49,19 @@ def load_accounts(folder='Data'):
     return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
             if os.path.isdir(os.path.join(folder, n))]
 
-def login_dengan_cookie(path,proxy=None, ua=None):
-    cookie_path = os.path.join(account_path, 'cookie.txt')
-    user_path = os.path.join(account_path, 'user.txt')
+def login_dengan_cookie(path):
+    cookie_path = os.path.join(path, 'cookie.txt')
+    user_path = os.path.join(path, 'user.txt')
 
     if not os.path.exists(cookie_path) or not os.path.exists(user_path):
-        print(Fore.RED + f"❌ cookie.txt / user.txt tidak ditemukan di {account_path}")
+        print(Fore.RED + f"❌ cookie.txt / user.txt tidak ditemukan di {path}")
         return None
 
     sessionid = open(cookie_path).read().strip()
     username = open(user_path).read().strip()
 
     if not sessionid or not username:
-        print(Fore.RED + f"❌ sessionid atau username kosong di {account_path}")
+        print(Fore.RED + f"❌ sessionid atau username kosong di {path}")
         return None
 
     # Load proxy & user-agent
@@ -70,9 +70,9 @@ def login_dengan_cookie(path,proxy=None, ua=None):
     proxies, uas = [], []
 
     for f in proxy_files:
-        proxies += load_file_lines(os.path.join(account_path, f))
+        proxies += load_file_lines(os.path.join(path, f))
     for f in ua_files:
-        uas += load_file_lines(os.path.join(account_path, f))
+        uas += load_file_lines(os.path.join(path, f))
 
     proxy, ua = pilih_kombinasi_valid(proxies, uas)
 
@@ -82,7 +82,7 @@ def login_dengan_cookie(path,proxy=None, ua=None):
     if proxy:
         cl.set_proxy(proxy)
     if ua:
-        cl.requests.headers["User-Agent"] = ua
+        cl.request.headers["User-Agent"] = ua
 
     try:
         cl.login_by_sessionid(sessionid)
