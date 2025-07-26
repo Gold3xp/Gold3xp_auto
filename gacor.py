@@ -53,19 +53,13 @@ def load_accounts(folder='Data'):
     return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
             if os.path.isdir(os.path.join(folder, n))]
 
-def login_dengan_username_password(path):
-    user_path = os.path.join(path, 'user.txt')
-    pass_path = os.path.join(path, 'pass.txt')
-
-    if not os.path.exists(user_path) or not os.path.exists(pass_path):
-        print(Fore.RED + f"❌ user.txt atau pass.txt tidak ditemukan di {path}")
-        return None
-
-    username = open(user_path).read().strip()
-    password = open(pass_path).read().strip()
+def login_manual_dengan_input(path):
+    print(Fore.CYAN + f"\n📁 Folder akun: {path}")
+    username = input("👤 Masukkan username IG: ").strip()
+    password = input("🔑 Masukkan password IG: ").strip()
 
     if not username or not password:
-        print(Fore.RED + f"❌ Username atau password kosong di {path}")
+        print(Fore.RED + "❌ Username atau password tidak boleh kosong!")
         return None
 
     proxy_files = ['Proxy.txt', 'Proxy2.txt']
@@ -174,7 +168,7 @@ def main():
         for name, path in accounts:
             clear_terminal()
             tampilkan_banner()
-            cl = login_dengan_username_password(path)
+            cl = login_manual_dengan_input(path)
             if not cl:
                 continue
             sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
