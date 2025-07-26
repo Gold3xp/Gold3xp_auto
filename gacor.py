@@ -26,12 +26,21 @@ def cek_proxy(proxy, ua):
         return False
 
 def pilih_kombinasi_valid(proxies, uas):
+    print(Fore.YELLOW + "🔍 Sedang memilih kombinasi proxy dan user-agent yang valid...")
+    total = len(proxies) * len(uas)
+    tested = 0
+
     random.shuffle(proxies)
     random.shuffle(uas)
+
     for proxy in proxies:
         for ua in uas:
+            tested += 1
+            print(Fore.CYAN + f"🔄 Menguji kombinasi ke-{tested}/{total}", end='\r')
             if cek_proxy(proxy, ua):
+                print(Fore.GREEN + f"\n✅ Kombinasi berhasil → Proxy: {proxy}, UA: {ua[:50]}...\n")
                 return proxy, ua
+    print(Fore.RED + "\n❌ Tidak ada kombinasi proxy dan user-agent yang valid.\n")
     return None, None
 
 def load_accounts(folder='Data'):
