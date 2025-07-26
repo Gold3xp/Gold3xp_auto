@@ -82,7 +82,7 @@ def login_dengan_cookie(path,proxy=None, ua=None):
     if proxy:
         cl.set_proxy(proxy)
     if ua:
-        cl.requests.headers["User-Agent") = ua
+        cl.requests.headers["User-Agent"] = ua
 
     try:
         cl.login_by_sessionid(sessionid)
