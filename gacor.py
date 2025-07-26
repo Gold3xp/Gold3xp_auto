@@ -49,7 +49,7 @@ def load_accounts(folder='Data'):
     return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
             if os.path.isdir(os.path.join(folder, n))]
 
-def login_dengan_cookie(account_path):
+def login_dengan_cookie(path,proxy=None, ua=None):
     cookie_path = os.path.join(account_path, 'cookie.txt')
     user_path = os.path.join(account_path, 'user.txt')
 
@@ -82,7 +82,7 @@ def login_dengan_cookie(account_path):
     if proxy:
         cl.set_proxy(proxy)
     if ua:
-        cl = Client(user_agent=ua)
+        cl.requests.headers["User-Agent") = ua
 
     try:
         cl.login_by_sessionid(sessionid)
