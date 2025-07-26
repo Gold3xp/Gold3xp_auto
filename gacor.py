@@ -85,7 +85,7 @@ def login_dengan_cookie(account_path):
         print(Fore.RED + f"❌ Gagal login: {username} — {e}")
         return None
 
-def auto_comment_loop(cl, targets, comments):
+def auto_comment_loop(cl, targets, comments, dummy_mode=False):
     posted = set()
     print(Fore.YELLOW + "\n⏳ Menunggu postingan baru...\n")
     while True:
@@ -106,16 +106,19 @@ def auto_comment_loop(cl, targets, comments):
 
                 print(Fore.GREEN + f"✅ Postingan baru dari @{target.strip()} — umur: {int(umur)} detik")
                 msg = random.choice(comments).strip()
-                try:
-                    cl.media_comment(m.id, msg)
-                    print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim ({int(umur)}s)")
-                    posted.add(m.id)
-                    found = True
-                except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
-                    print(Fore.RED + "🚫 Akun dibatasi. Pindah akun.")
-                    return False
-                except Exception as e:
-                    print(Fore.RED + f"❌ Gagal komentar: {e}")
+                if dummy_mode:
+                    print(Fore.MAGENTA + f"💡 DUMMY: Komentar tidak dikirim → \"{msg}\"")
+                else:
+                    try:
+                        cl.media_comment(m.id, msg)
+                        print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim ({int(umur)}s)")
+                    except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
+                        print(Fore.RED + "🚫 Akun dibatasi. Pindah akun.")
+                        return False
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Gagal komentar: {e}")
+                posted.add(m.id)
+                found = True
             except:
                 continue
 
@@ -134,6 +137,8 @@ def main():
         print(Fore.RED + "❌ Lisensi tidak valid.")
         sys.exit()
 
+    dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
+
     accounts = load_accounts('Data')
     if not accounts:
         print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
@@ -151,7 +156,7 @@ def main():
         cl = login_dengan_cookie(path)
         if not cl:
             continue
-        sukses = auto_comment_loop(cl, targets, comments)
+        sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
         try:
             cl.logout()
             print(Fore.GREEN + "🔒 Logout berhasil.\n")
