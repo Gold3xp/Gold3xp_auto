@@ -53,19 +53,19 @@ def load_accounts(folder='Data'):
     return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
             if os.path.isdir(os.path.join(folder, n))]
 
-def login_dengan_cookie(path):
-    cookie_path = os.path.join(path, 'cookie.txt')
+def login_dengan_username_password(path):
     user_path = os.path.join(path, 'user.txt')
+    pass_path = os.path.join(path, 'pass.txt')
 
-    if not os.path.exists(cookie_path) or not os.path.exists(user_path):
-        print(Fore.RED + f"❌ cookie.txt / user.txt tidak ditemukan di {path}")
+    if not os.path.exists(user_path) or not os.path.exists(pass_path):
+        print(Fore.RED + f"❌ user.txt atau pass.txt tidak ditemukan di {path}")
         return None
 
-    sessionid = open(cookie_path).read().strip()
     username = open(user_path).read().strip()
+    password = open(pass_path).read().strip()
 
-    if not sessionid or not username:
-        print(Fore.RED + f"❌ sessionid atau username kosong di {path}")
+    if not username or not password:
+        print(Fore.RED + f"❌ Username atau password kosong di {path}")
         return None
 
     proxy_files = ['Proxy.txt', 'Proxy2.txt']
@@ -90,7 +90,7 @@ def login_dengan_cookie(path):
         if proxy:
             cl.set_proxy(proxy)
 
-        cl.login_by_sessionid(sessionid)
+        cl.login(username, password)
         user_info = cl.account_info()
         print(Fore.GREEN + f"✅ Login berhasil: {user_info.username}\n")
         cl.username_login = user_info.username
@@ -103,6 +103,7 @@ def auto_comment_loop(cl, targets, comments, dummy_mode=False):
     posted = set()
     print(Fore.YELLOW + "\n⏳ Menunggu postingan baru...\n")
     while True:
+        clear_terminal()
         now = time.time()
         found = False
 
@@ -144,44 +145,50 @@ def auto_comment_loop(cl, targets, comments, dummy_mode=False):
     return True
 
 def main():
-    clear_terminal()
-    tampilkan_banner()
+    while True:
+        clear_terminal()
+        tampilkan_banner()
 
-    lisensi = input("🔑 Masukkan kode lisensi: ")
-    if not is_license_valid(lisensi):
-        print(Fore.RED + "❌ Lisensi tidak valid.")
-        sys.exit()
+        lisensi = input("🔑 Masukkan kode lisensi: ")
+        if not is_license_valid(lisensi):
+            print(Fore.RED + "❌ Lisensi tidak valid.")
+            input("Tekan ENTER untuk keluar...")
+            sys.exit()
 
-    dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
+        dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
 
-    accounts = load_accounts('Data')
-    if not accounts:
-        print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
-        return
+        accounts = load_accounts('Data')
+        if not accounts:
+            print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
+            input("Tekan ENTER untuk keluar...")
+            return
 
-    targets = []
-    while not targets:
-        targets = input("🎯 Target username (pisah dengan koma): ").split(',')
+        targets = []
+        while not targets:
+            targets = input("🎯 Target username (pisah dengan koma): ").split(',')
 
-    comments = []
-    while not comments:
-        comments = input("💬 Komentar (pisah dengan |): ").split('|')
+        comments = []
+        while not comments:
+            comments = input("💬 Komentar (pisah dengan |): ").split('|')
 
-    for name, path in accounts:
-        cl = login_dengan_cookie(path)
-        if not cl:
-            continue
-        sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
-        try:
-            cl.logout()
-            print(Fore.GREEN + "🔒 Logout berhasil.\n")
-        except:
-            pass
-        if sukses:
-            print(Fore.GREEN + "✅ Semua komentar terkirim.")
-            break
-    else:
-        print(Fore.RED + "❌ Semua akun gagal login atau dibatasi.")
+        for name, path in accounts:
+            clear_terminal()
+            tampilkan_banner()
+            cl = login_dengan_username_password(path)
+            if not cl:
+                continue
+            sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
+            try:
+                cl.logout()
+                print(Fore.GREEN + "🔒 Logout berhasil.\n")
+            except:
+                pass
+            if sukses:
+                print(Fore.GREEN + "✅ Semua komentar terkirim.")
+                break
+        else:
+            print(Fore.RED + "❌ Semua akun gagal login atau dibatasi.")
+        input("Tekan ENTER untuk mengulang atau CTRL+C untuk keluar.")
 
 if __name__ == '__main__':
     main()
