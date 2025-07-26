@@ -17,7 +17,6 @@ def load_file_lines(path):
         print(Fore.RED + f"❌ File kosong: {path}")
     return lines
 
-# Ambil per‑akun subfolder dari Data/
 def load_accounts(base='Data'):
     akuns = []
     for name in os.listdir(base):
@@ -37,12 +36,18 @@ def login_dengan_cookie(account_path):
     if not sessionid or not username:
         print(Fore.RED + f"❌ sessionid/user kosong di {account_path}")
         return None
+
     proxies = load_file_lines(os.path.join(account_path, 'Proxy.txt')) \
             + load_file_lines(os.path.join(account_path, 'Proxy2.txt'))
     uas = load_file_lines(os.path.join(account_path, 'Ua.txt')) \
           + load_file_lines(os.path.join(account_path, 'User-agents.txt'))
+    
     proxy = random.choice(proxies) if proxies else None
     ua = random.choice(uas) if uas else None
+
+    if proxy and not proxy.startswith("http"):
+        print(Fore.YELLOW + f"⚠️ Format proxy tidak valid, diabaikan: {proxy}")
+        proxy = None
 
     print(Fore.CYAN + f"🔐 Login akun `{username}` — proxy: {proxy}, UA: {ua}")
     cl = Client()
@@ -55,6 +60,7 @@ def login_dengan_cookie(account_path):
         cl.login_by_sessionid(sessionid)
         cl.get_timeline_feed()
         print(Fore.GREEN + f"✅ Login sukses: {username}\n")
+        cl.username_login = username  # Simpan nama untuk digunakan nanti
         return cl
     except Exception as e:
         print(Fore.RED + f"❌ Gagal login {username}: {e}")
@@ -62,7 +68,7 @@ def login_dengan_cookie(account_path):
 
 def auto_comment_loop(cl, targets, comments):
     sudah = set()
-    print("\n🚀 Auto‑comment jalan…")
+    print("\n🚀 Auto-comment aktif. Menunggu postingan baru…\n")
     while True:
         now = time.time()
         ada = False
@@ -76,13 +82,12 @@ def auto_comment_loop(cl, targets, comments):
                 umur = now - m.taken_at.timestamp()
                 if m.id in sudah:
                     continue
-                # komentar di detik ke 30–31
                 if 30 <= umur < 32:
-                    print(Fore.GREEN + f"🆕 Postingan baru {u}: umur {int(umur)} detik")
+                    print(Fore.GREEN + f"🆕 Postingan baru dari @{u} — umur {int(umur)} detik")
                     msg = random.choice(comments)
                     try:
                         cl.media_comment(m.id, msg)
-                        print(Fore.CYAN + "💬 Komentar terkirim")
+                        print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim pada detik ke-{int(umur)}")
                         sudah.add(m.id)
                         ada = True
                     except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
@@ -93,32 +98,31 @@ def auto_comment_loop(cl, targets, comments):
             except Exception:
                 continue
         if not ada:
-            print(Fore.YELLOW + "⏳ Menunggu postingan baru…" )
-            time.sleep(0.8)
+            print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+            time.sleep(0.6)  # Lebih cepat agar tidak telat
         else:
-            time.sleep(random.randint(3,6))
-        # tetap loop sampai semua akun limit
+            time.sleep(random.randint(3, 6))
     return True
 
 def main():
     clear_terminal()
     tampilkan_banner()
     if not is_license_valid(input("🔑 Masukkan kode lisensi: ")):
-        print(Fore.RED + "❌ Lisensi tidak valid"); sys.exit()
+        print(Fore.RED + "❌ Lisensi tidak valid")
+        sys.exit()
 
     accounts = load_accounts('Data')
     if not accounts:
-        print(Fore.RED + "❌ Tidak ditemukan folder akun dalam Data/"); return
+        print(Fore.RED + "❌ Tidak ditemukan folder akun dalam Data/")
+        return
 
-    targets = []
-    comments = []
     while True:
-        a = input("Masukkan target (username1,username2…): ")
+        a = input("🎯 Masukkan target (username1,username2,…): ")
         targets = [i.strip() for i in a.split(',') if i.strip()]
         if targets:
             break
     while True:
-        c = input("Masukkan komentar (pisah dengan '|'): ")
+        c = input("💬 Masukkan komentar (pisah dengan '|'): ")
         comments = [i.strip() for i in c.split('|') if i.strip()]
         if comments:
             break
@@ -134,10 +138,10 @@ def main():
         except:
             pass
         if sukses:
-            print(Fore.GREEN + "✅ Komentar sukses—selesai.")
+            print(Fore.GREEN + "✅ Semua komentar terkirim — selesai.")
             break
     else:
-        print(Fore.RED + "❌ Semua akun dibatasi atau gagal. Program berhenti.")
+        print(Fore.RED + "❌ Semua akun dibatasi atau gagal login. Program berhenti.")
 
 if __name__ == '__main__':
     main()
