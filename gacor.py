@@ -8,194 +8,136 @@ from utils.banner import tampilkan_banner
 
 init(autoreset=True)
 
-# Fungsi bantu
-def input_list(prompt, separator=","):
-    print(f"{prompt} (pisahkan dengan '{separator}')")
-    return [i.strip() for i in input(">> ").split(separator) if i.strip()]
+def load_file_lines(path):
+    if not os.path.exists(path):
+        print(Fore.RED + f"❌ File tidak ditemukan: {path}")
+        return []
+    lines = [l.strip() for l in open(path) if l.strip()]
+    if not lines:
+        print(Fore.RED + f"❌ File kosong: {path}")
+    return lines
 
-def konfirmasi(data, nama_data):
-    print(f"\n📌 Konfirmasi {nama_data}:")
-    for i, d in enumerate(data, 1):
-        print(f"{i}. {d}")
-    while True:
-        lanjut = input("✅ Lanjut? (y = ya, r = ubah, x = keluar): ").lower()
-        if lanjut == "y":
-            return data
-        elif lanjut == "r":
-            return None
-        elif lanjut == "x":
-            print("❌ Dibatalkan.")
-            exit()
-        else:
-            print("⚠️ Pilih hanya: y / r / x")
+# Ambil per‑akun subfolder dari Data/
+def load_accounts(base='Data'):
+    akuns = []
+    for name in os.listdir(base):
+        d = os.path.join(base, name)
+        if os.path.isdir(d):
+            akuns.append((name, d))
+    return akuns
 
-# Ambil proxy dari file
-def get_proxy():
-    proxies = []
-    for file in ['Proxy.txt', 'Proxy2.txt']:
-        if os.path.exists(file):
-            with open(file) as f:
-                proxies += [p.strip() for p in f if p.strip()]
-    return random.choice(proxies) if proxies else None
+def login_dengan_cookie(account_path):
+    ck = os.path.join(account_path, 'cookie.txt')
+    usr = os.path.join(account_path, 'user.txt')
+    sessionid = ''
+    username = ''
+    if os.path.exists(ck) and os.path.exists(usr):
+        sessionid = open(ck).read().strip()
+        username = open(usr).read().strip()
+    if not sessionid or not username:
+        print(Fore.RED + f"❌ sessionid/user kosong di {account_path}")
+        return None
+    proxies = load_file_lines(os.path.join(account_path, 'Proxy.txt')) \
+            + load_file_lines(os.path.join(account_path, 'Proxy2.txt'))
+    uas = load_file_lines(os.path.join(account_path, 'Ua.txt')) \
+          + load_file_lines(os.path.join(account_path, 'User-agents.txt'))
+    proxy = random.choice(proxies) if proxies else None
+    ua = random.choice(uas) if uas else None
 
-# Ambil user-agent dari file
-def get_user_agent():
-    uas = []
-    for file in ['Ua.txt', 'User-agents.txt']:
-        if os.path.exists(file):
-            with open(file) as f:
-                uas += [ua.strip() for ua in f if ua.strip()]
-    return random.choice(uas) if uas else "Mozilla/5.0 (Android 12; Mobile)"
-
-# Login dengan cookie
-def login_dengan_cookie():
-    print("\n🔐 LOGIN DENGAN COOKIE")
-    try:
-        with open("cookie.txt") as f:
-            sessionid = f.read().strip()
-        with open("user.txt") as f:
-            username = f.read().strip()
-    except:
-        print(Fore.RED + "❌ Gagal membaca cookie.txt atau user.txt")
-        exit()
-
+    print(Fore.CYAN + f"🔐 Login akun `{username}` — proxy: {proxy}, UA: {ua}")
     cl = Client()
-    try:
-        proxy = get_proxy()
-        if proxy:
-            cl.set_proxy(proxy)
+    if proxy:
+        cl.set_proxy(proxy)
+    if ua:
+        cl.headers.update({'User-Agent': ua})
 
-        cl.headers.update({"User-Agent": get_user_agent()})
+    try:
         cl.login_by_sessionid(sessionid)
         cl.get_timeline_feed()
-        print(Fore.GREEN + f"✅ Login berhasil sebagai {username}\n")
+        print(Fore.GREEN + f"✅ Login sukses: {username}\n")
         return cl
     except Exception as e:
-        print(Fore.RED + f"❌ Gagal login dengan cookie: {e}")
-        exit()
-
-def cek_lisensi():
-    print("🔑 CEK LISENSI")
-    lisensi = input("Masukkan kode lisensi: ")
-    if not is_license_valid(lisensi):
-        print("❌ Lisensi tidak valid.")
-        exit()
-    print("✅ Lisensi valid.\n")
+        print(Fore.RED + f"❌ Gagal login {username}: {e}")
+        return None
 
 def auto_comment_loop(cl, targets, comments):
-    sudah_dikomentari = set()
-    print("\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
-    sudah_print_menunggu = False
-    try:
-        while True:
-            now = time.time()
-            ada_post_baru = False
-
-            for username in targets:
-                try:
-                    user_id = cl.user_id_from_username(username)
-                    medias = cl.user_medias(user_id, amount=1)
-                    if not medias:
-                        continue
-
-                    media = medias[0]
-                    media_id = media.id
-                    umur = now - media.taken_at.timestamp()
-
-                    if media_id in sudah_dikomentari:
-                        continue
-
-                    if 30 <= umur < 32:
-                        print(Fore.GREEN + f"✅ Postingan baru ditemukan! (user: {username}, umur: {int(umur)} detik)")
-                        komentar = random.choice(comments)
-                        try:
-                            cl.media_comment(media_id, komentar)
-                            print(Fore.CYAN + "💬 Komentar terkirim")
-                            sudah_dikomentari.add(media_id)
-                            ada_post_baru = True
-                        except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
-                            print(Fore.RED + "🚫 Akun dibatasi Instagram. Berhenti otomatis.")
-                            return
-                        except Exception as e:
-                            print(Fore.RED + f"❌ Gagal komentar: {e}")
-                except:
+    sudah = set()
+    print("\n🚀 Auto‑comment jalan…")
+    while True:
+        now = time.time()
+        ada = False
+        for u in targets:
+            try:
+                uid = cl.user_id_from_username(u)
+                medias = cl.user_medias(uid, amount=1)
+                if not medias:
                     continue
-
-            if not ada_post_baru:
-                if not sudah_print_menunggu:
-                    print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
-                    sudah_print_menunggu = True
-                time.sleep(0.8)
-            else:
-                sudah_print_menunggu = False
-                jeda = random.randint(3, 6)
-                print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
-                time.sleep(jeda)
-    except KeyboardInterrupt:
-        print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
-    except Exception as e:
-        print(Fore.RED + f"\n⚠️ Terjadi kesalahan: {e}")
-    finally:
-        try:
-            cl.logout()
-            print(Fore.GREEN + "🔒 Logout berhasil.")
-        except:
-            print(Fore.RED + "⚠️ Gagal logout.")
-
-def menu():
-    print(Fore.CYAN + "\n==== MENU ====")
-    print("1. Jalankan auto-comment")
-    print("2. Logout Instagram")
-    print("3. Keluar")
-    return input("Pilih menu: ")
+                m = medias[0]
+                umur = now - m.taken_at.timestamp()
+                if m.id in sudah:
+                    continue
+                # komentar di detik ke 30–31
+                if 30 <= umur < 32:
+                    print(Fore.GREEN + f"🆕 Postingan baru {u}: umur {int(umur)} detik")
+                    msg = random.choice(comments)
+                    try:
+                        cl.media_comment(m.id, msg)
+                        print(Fore.CYAN + "💬 Komentar terkirim")
+                        sudah.add(m.id)
+                        ada = True
+                    except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
+                        print(Fore.RED + "🚫 Akun dibatasi — pindah akun")
+                        return False
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Gagal komentar: {e}")
+            except Exception:
+                continue
+        if not ada:
+            print(Fore.YELLOW + "⏳ Menunggu postingan baru…" )
+            time.sleep(0.8)
+        else:
+            time.sleep(random.randint(3,6))
+        # tetap loop sampai semua akun limit
+    return True
 
 def main():
     clear_terminal()
     tampilkan_banner()
-    cek_lisensi()
-    cl = login_dengan_cookie()
+    if not is_license_valid(input("🔑 Masukkan kode lisensi: ")):
+        print(Fore.RED + "❌ Lisensi tidak valid"); sys.exit()
 
+    accounts = load_accounts('Data')
+    if not accounts:
+        print(Fore.RED + "❌ Tidak ditemukan folder akun dalam Data/"); return
+
+    targets = []
+    comments = []
     while True:
-        clear_terminal()
-        tampilkan_banner()
-        pilihan = menu()
-
-        if pilihan == "1":
-            clear_terminal()
-            tampilkan_banner()
-            while True:
-                targets = input_list("Masukkan daftar target username (tanpa @, pisahkan dengan koma)", ",")
-                confirmed = konfirmasi(targets, "target")
-                if confirmed:
-                    break
-
-            while True:
-                comments = input_list("Masukkan daftar komentar (pisahkan dengan '|')", "|")
-                confirmed = konfirmasi(comments, "komentar")
-                if confirmed:
-                    break
-
-            print(Fore.GREEN + "\n▶️ Menjalankan auto-comment...\n")
-            auto_comment_loop(cl, targets, comments)
-            input(Fore.YELLOW + "\nTekan Enter untuk kembali ke menu...")
-
-        elif pilihan == "2":
-            clear_terminal()
-            tampilkan_banner()
-            try:
-                cl.logout()
-                print(Fore.GREEN + "✅ Berhasil logout.\n")
-            except:
-                print(Fore.RED + "❌ Logout gagal.\n")
-            input("Tekan Enter untuk kembali...")
-
-        elif pilihan == "3":
-            print(Fore.CYAN + "\n👋 Keluar...")
+        a = input("Masukkan target (username1,username2…): ")
+        targets = [i.strip() for i in a.split(',') if i.strip()]
+        if targets:
+            break
+    while True:
+        c = input("Masukkan komentar (pisah dengan '|'): ")
+        comments = [i.strip() for i in c.split('|') if i.strip()]
+        if comments:
             break
 
-        else:
-            print(Fore.RED + "\n❌ Pilihan tidak valid!")
-            input("Tekan Enter untuk kembali...")
+    for name, path in accounts:
+        cl = login_dengan_cookie(path)
+        if not cl:
+            continue
+        sukses = auto_comment_loop(cl, targets, comments)
+        try:
+            cl.logout()
+            print(Fore.GREEN + "🔒 Logout akun berhasil.\n")
+        except:
+            pass
+        if sukses:
+            print(Fore.GREEN + "✅ Komentar sukses—selesai.")
+            break
+    else:
+        print(Fore.RED + "❌ Semua akun dibatasi atau gagal. Program berhenti.")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
