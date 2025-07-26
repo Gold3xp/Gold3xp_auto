@@ -79,19 +79,19 @@ def login_dengan_cookie(path):
     print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
 
     cl = Client()
-    if proxy:
-        cl.set_proxy(proxy)
-    if ua:
-        cl.headers = {
-            "User-Agent": ua,
-            "X-IG-App-ID": "936619743392459"
-        }
-
     try:
+        if proxy:
+            cl.set_proxy(proxy)
+        if ua:
+            cl.headers.update({
+                "User-Agent": ua,
+                "X-IG-App-ID": "936619743392459"
+            })
+
         cl.login_by_sessionid(sessionid)
-        cl.get_timeline_feed()
-        cl.username_login = username
-        print(Fore.GREEN + f"✅ Login berhasil: {username}\n")
+        user_info = cl.account_info()
+        print(Fore.GREEN + f"✅ Login berhasil: {user_info.username}\n")
+        cl.username_login = user_info.username
         return cl
     except Exception as e:
         print(Fore.RED + f"❌ Gagal login: {username} — {e}")
@@ -131,7 +131,8 @@ def auto_comment_loop(cl, targets, comments, dummy_mode=False):
                         print(Fore.RED + f"❌ Gagal komentar: {e}")
                 posted.add(m.id)
                 found = True
-            except:
+            except Exception as e:
+                print(Fore.LIGHTRED_EX + f"⚠️ Gagal ambil data target @{target.strip()}: {e}")
                 continue
 
         if not found:
