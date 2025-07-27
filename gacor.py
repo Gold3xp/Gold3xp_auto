@@ -1,182 +1,123 @@
-import os, sys, random, time, requests
 from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes
+from instagrapi.exceptions import (
+    ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes, LoginRequired
+)
 from colorama import Fore, init
 from utils.license_check import is_license_valid
-from utils.tools import clear_terminal
-from utils.banner import tampilkan_banner
+from utils.tools import clear_terminal, load_file_lines, tampilkan_banner
+import os, time, random, json
 
 init(autoreset=True)
 
-def load_file_lines(path):
-    if not os.path.exists(path):
-        return []
-    return [line.strip() for line in open(path) if line.strip()]
+def parse_cookie_string(cookie_str):
+    cookies = {}
+    for item in cookie_str.split(";"):
+        if "=" in item:
+            key, value = item.strip().split("=", 1)
+            cookies[key] = value
+    return cookies
 
-def cek_proxy(proxy, ua):
-    try:
-        response = requests.get(
-            "https://www.instagram.com/",
-            proxies={"http": proxy, "https": proxy},
-            headers={"User-Agent": ua},
-            timeout=5
-        )
-        return response.status_code == 200
-    except:
-        return False
-
-def pilih_kombinasi_valid(proxies, uas):
-    print(Fore.YELLOW + "🔍 Sedang memilih kombinasi proxy dan user-agent yang valid...")
-    total = len(proxies) * len(uas)
-    tested = 0
-
-    random.shuffle(proxies)
-    random.shuffle(uas)
-
-    for proxy in proxies:
-        for ua in uas:
-            tested += 1
-            print(Fore.CYAN + f"🔄 Menguji kombinasi ke-{tested}/{total}", end='\r')
-            if cek_proxy(proxy, ua):
-                print(Fore.GREEN + f"\n✅ Kombinasi berhasil → Proxy: {proxy}, UA: {ua[:50]}...\n")
-                return proxy, ua
-    print(Fore.RED + "\n❌ Tidak ada kombinasi proxy dan user-agent yang valid.\n")
-    return None, None
-
-def load_accounts(folder='Data'):
-    if not os.path.exists(folder):
-        return []
-    return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
-            if os.path.isdir(os.path.join(folder, n))]
-
-def login_dengan_cookie(path):
-    cookie_path = os.path.join(path, 'cookie.txt')
-    user_path = os.path.join(path, 'user.txt')
-
-    if not os.path.exists(cookie_path) or not os.path.exists(user_path):
-        print(Fore.RED + f"❌ cookie.txt / user.txt tidak ditemukan di {path}")
-        return None
-
-    sessionid = open(cookie_path).read().strip()
-    username = open(user_path).read().strip()
-
-    if not sessionid or not username:
-        print(Fore.RED + f"❌ sessionid atau username kosong di {path}")
-        return None
-
-    # Load proxy & user-agent
-    proxy_files = ['Proxy.txt', 'Proxy2.txt']
-    ua_files = ['Ua.txt', 'User-agents.txt']
-    proxies, uas = [], []
-
-    for f in proxy_files:
-        proxies += load_file_lines(os.path.join(path, f))
-    for f in ua_files:
-        uas += load_file_lines(os.path.join(path, f))
-
-    proxy, ua = pilih_kombinasi_valid(proxies, uas)
-
-    print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
-
+def login_dengan_cookie(folder):
     cl = Client()
     try:
-        if proxy:
+        cookie_path = os.path.join(folder, "cookie.txt")
+        user_path = os.path.join(folder, "user.txt")
+        ua_path = os.path.join(folder, "Ua.txt")
+        proxy_path = os.path.join(folder, "Proxy.txt")
+
+        cookie_str = open(cookie_path, "r").read().strip()
+        username = open(user_path, "r").read().strip()
+        ua_list = load_file_lines(ua_path)
+        proxy_list = load_file_lines(proxy_path)
+
+        cookies = parse_cookie_string(cookie_str)
+        cl.set_user_agent(random.choice(ua_list) if ua_list else None)
+        if proxy_list:
+            proxy = random.choice(proxy_list)
             cl.set_proxy(proxy)
-        if ua:
-            cl.set_user_agent(ua)
 
-        cl.login_by_sessionid(sessionid)
-        user_info = cl.account_info()
-        print(Fore.GREEN + f"✅ Login berhasil: {user_info.username}\n")
-        cl.username_login = user_info.username  # manual simpan untuk digunakan di log
-        return cl
+        cl.set_cookie(cookies)
+        cl.user_id = int(cookies["ds_user_id"])
+        cl.account_id = cl.user_id
+        cl.logged_in = True
+        cl.get_timeline_feed()  # validasi login
+        print(Fore.GREEN + f"✅ Login berhasil: {username}")
+        return cl, username
     except Exception as e:
-        print(Fore.RED + f"❌ Gagal login: {username} — {e}")
-        return None
+        print(Fore.RED + f"❌ Login gagal: {e}")
+        return None, None
 
-def auto_comment_loop(cl, targets, comments, dummy_mode=False):
-    posted = set()
-    print(Fore.YELLOW + "\n⏳ Menunggu postingan baru...\n")
+def mode_gacor(cl, username, targets, komentar_list, dummy):
+    print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+
+    terbaru = {}
     while True:
-        now = time.time()
-        found = False
-
         for target in targets:
             try:
-                uid = cl.user_id_from_username(target.strip())
-                media = cl.user_medias(uid, 1)
-                if not media:
+                user_id = cl.user_id_from_username(target)
+                feed = cl.user_medias(user_id, 1)
+                if not feed:
                     continue
 
-                m = media[0]
-                umur = now - m.taken_at.timestamp()
-                if m.id in posted or umur < 30 or umur >= 32:
-                    continue
+                post = feed[0]
+                post_id = post.pk
+                timestamp = post.taken_at.timestamp()
+                now = time.time()
+                age = int(now - timestamp)
 
-                print(Fore.GREEN + f"✅ Postingan baru dari @{target.strip()} — umur: {int(umur)} detik")
-                msg = random.choice(comments).strip()
-                if dummy_mode:
-                    print(Fore.MAGENTA + f"💡 DUMMY: Komentar tidak dikirim → \"{msg}\"")
-                else:
-                    try:
-                        cl.media_comment(m.id, msg)
-                        print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim ({int(umur)}s)")
-                    except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
-                        print(Fore.RED + "🚫 Akun dibatasi. Pindah akun.")
-                        return False
-                    except Exception as e:
-                        print(Fore.RED + f"❌ Gagal komentar: {e}")
-                posted.add(m.id)
-                found = True
+                if post_id != terbaru.get(target) and 30 <= age <= 31:
+                    terbaru[target] = post_id
+                    print(Fore.GREEN + f"✅ Postingan baru oleh @{target} (umur: {age}s)")
+
+                    komentar = random.choice(komentar_list)
+                    if dummy:
+                        print(Fore.CYAN + f"💬 Dummy komentar: {komentar}")
+                    else:
+                        cl.media_comment(post_id, komentar)
+                        print(Fore.CYAN + f"💬 Komentar terkirim: {komentar}")
+
+                    print(Fore.YELLOW + "🕒 Jeda 5 detik...\n")
+                    time.sleep(5)
+
             except Exception as e:
-                print(Fore.LIGHTRED_EX + f"⚠️ Gagal ambil data target @{target.strip()}: {e}")
-                continue
+                print(Fore.RED + f"❌ Error @{target}: {e}")
+                if "Please wait" in str(e) or isinstance(e, FeedbackRequired):
+                    raise Exception("Akun limit")
 
-        if not found:
-            time.sleep(0.6)
-        else:
-            time.sleep(random.randint(3, 6))
-    return True
+        time.sleep(1)
 
-def main():
-    clear_terminal()
-    tampilkan_banner()
-
-    lisensi = input("🔑 Masukkan kode lisensi: ")
-    if not is_license_valid(lisensi):
-        print(Fore.RED + "❌ Lisensi tidak valid.")
-        sys.exit()
-
-    dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
-
-    accounts = load_accounts('Data')
-    if not accounts:
-        print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
+def rotasi_multi_akun():
+    akun_dirs = sorted([d for d in os.listdir("Data") if os.path.isdir(os.path.join("Data", d))])
+    if not akun_dirs:
+        print(Fore.RED + "❌ Tidak ada folder akun di /Data/")
         return
 
-    targets = []
-    while not targets:
-        targets = input("🎯 Target username (pisah dengan koma): ").split(',')
+    komentar_list = input("💬 Masukkan komentar (pisahkan dengan |):\n>> ").split("|")
+    targets = input("🎯 Masukkan target username (pisahkan dengan koma):\n>> ").split(",")
+    dummy = input("🤖 Mode dummy? (y/n): ").lower() == "y"
 
-    comments = []
-    while not comments:
-        comments = input("💬 Komentar (pisah dengan |): ").split('|')
+    for akun in akun_dirs:
+        clear_terminal()
+        tampilkan_banner()
+        print(Fore.BLUE + f"🔁 Menggunakan akun: {akun}")
+        folder = os.path.join("Data", akun)
 
-    for name, path in accounts:
-        cl = login_dengan_cookie(path)
+        cl, username = login_dengan_cookie(folder)
         if not cl:
             continue
-        sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
-        try:
-            cl.logout()
-            print(Fore.GREEN + "🔒 Logout berhasil.\n")
-        except:
-            pass
-        if sukses:
-            print(Fore.GREEN + "✅ Semua komentar terkirim.")
-            break
-    else:
-        print(Fore.RED + "❌ Semua akun gagal login atau dibatasi.")
 
-if __name__ == '__main__':
-    main()
+        try:
+            mode_gacor(cl, username, [t.strip() for t in targets], komentar_list, dummy)
+        except Exception as e:
+            print(Fore.RED + f"⚠️ Akun {akun} berhenti: {e}")
+            print(Fore.YELLOW + "🔄 Beralih ke akun berikutnya...\n")
+            time.sleep(3)
+            continue
+
+if __name__ == "__main__":
+    clear_terminal()
+    tampilkan_banner()
+    if not is_license_valid():
+        print(Fore.RED + "❌ Lisensi tidak valid!")
+        exit()
+    rotasi_multi_akun()
