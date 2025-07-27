@@ -1,186 +1,166 @@
-import os, sys, time, random, requests
-from bs4 import BeautifulSoup
+from instagrapi import Client
 from colorama import Fore, init
+import time, random
 from utils.license_check import is_license_valid
 from utils.tools import clear_terminal
 from utils.banner import tampilkan_banner
 
 init(autoreset=True)
 
-def load_file_lines(path):
-    if not os.path.exists(path):
-        return []
-    return [line.strip() for line in open(path) if line.strip()]
+def input_list(prompt, separator=","):
+    print(f"{prompt} (pisahkan dengan '{separator}')")
+    return [i.strip() for i in input(">> ").split(separator) if i.strip()]
 
-def load_accounts(folder='Data'):
-    if not os.path.exists(folder):
-        return []
-    return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
-            if os.path.isdir(os.path.join(folder, n))]
-
-def baca_cookie_file(path):
-    try:
-        with open(os.path.join(path, "cookie.txt"), "r") as f:
-            isi = f.read().strip()
-        bagian = dict(item.strip().split("=") for item in isi.split("; ") if "=" in item)
-        sessionid = bagian.get("sessionid")
-        ds_user_id = bagian.get("ds_user_id")
-        if sessionid and ds_user_id:
-            return sessionid, ds_user_id
-        else:
-            print(Fore.RED + f"[!] Format cookie salah di {path}")
-            return None, None
-    except FileNotFoundError:
-        print(Fore.RED + f"[!] cookie.txt tidak ditemukan di {path}")
-        return None, None
-    except Exception as e:
-        print(Fore.RED + f"[!] Gagal baca cookie di {path}: {e}")
-        return None, None
-
-def login_dengan_cookie(path):
-    sessionid, ds_user_id = baca_cookie_file(path)
-    if not sessionid or not ds_user_id:
-        return None, None
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
-        "Referer": "https://www.instagram.com/",
-        "X-Requested-With": "XMLHttpRequest"
-    }
-
-    cookies = {
-        "sessionid": sessionid,
-        "ds_user_id": ds_user_id
-    }
-
-    session = requests.Session()
-    session.headers.update(headers)
-    session.cookies.update(cookies)
-
-    try:
-        res = session.get("https://www.instagram.com/accounts/edit/")
-        if res.status_code == 200 and '"username":"' in res.text:
-            username = res.json().get("username", "unknown")
-            print(Fore.GREEN + f"[✅] Login berhasil: {username}")
-            return session, username
-        else:
-            print(Fore.RED + "[❌] Cookie invalid atau expired.")
-            return None, None
-    except Exception as e:
-        print(Fore.RED + f"[!] Gagal akses Instagram: {e}")
-        return None, None
-
-def get_latest_post(session, target_username):
-    try:
-        res = session.get(f"https://www.instagram.com/{target_username}/")
-        if res.status_code != 200:
-            return None
-
-        html = res.text
-        soup = BeautifulSoup(html, "html.parser")
-        for script in soup.find_all("script"):
-            if 'window._sharedData =' in script.text:
-                json_text = script.text.split(' = ', 1)[1].rstrip(';')
-                import json
-                data = json.loads(json_text)
-                try:
-                    media = data["entry_data"]["ProfilePage"][0]["graphql"]["user"]["edge_owner_to_timeline_media"]["edges"]
-                    if not media:
-                        return None
-                    return media[0]["node"]
-                except:
-                    return None
-        return None
-    except Exception as e:
-        print(Fore.RED + f"⚠️ Gagal ambil postingan @{target_username}: {e}")
-        return None
-
-def auto_comment_loop(session, username, targets, comments, dummy_mode=False):
-    posted = set()
-    print(Fore.YELLOW + "\n⏳ Menunggu postingan baru...\n")
-    printed = False
-
+def konfirmasi(data, nama_data):
+    print(f"\n📌 Konfirmasi {nama_data}:")
+    for i, d in enumerate(data, 1):
+        print(f"{i}. {d}")
     while True:
-        now = time.time()
-        found = False
-
-        for target in targets:
-            media = get_latest_post(session, target.strip())
-            if not media:
-                continue
-
-            media_id = media["id"]
-            timestamp = media["taken_at_timestamp"]
-            umur = now - timestamp
-
-            if media_id in posted or umur < 30 or umur > 31:
-                continue
-
-            print(Fore.GREEN + f"✅ Postingan baru dari @{target} — umur: {int(umur)} detik")
-            msg = random.choice(comments).strip()
-
-            if dummy_mode:
-                print(Fore.MAGENTA + f"💡 DUMMY: Tidak kirim → \"{msg}\"")
-            else:
-                try:
-                    comment_url = f"https://www.instagram.com/web/comments/{media_id}/add/"
-                    res = session.post(comment_url, data={"comment_text": msg})
-                    if res.status_code == 200:
-                        print(Fore.CYAN + f"💬 @{username}: Komentar terkirim ({int(umur)}s)")
-                    elif res.status_code == 400:
-                        print(Fore.RED + "🚫 Komentar ditolak (400) — Akun dibatasi?")
-                        return False
-                    else:
-                        print(Fore.RED + f"❌ Gagal komentar: {res.status_code} — {res.text}")
-                except Exception as e:
-                    print(Fore.RED + f"❌ Gagal komentar: {e}")
-            posted.add(media_id)
-            found = True
-
-        if not found:
-            if not printed:
-                print(Fore.YELLOW + "⏳ Menunggu postingan baru...", end='\r')
-                printed = True
-            time.sleep(0.6)
+        lanjut = input("✅ Lanjut? (y = ya, r = ubah, x = keluar): ").lower()
+        if lanjut == "y":
+            return data
+        elif lanjut == "r":
+            return None
+        elif lanjut == "x":
+            print("❌ Dibatalkan.")
+            exit()
         else:
-            printed = False
-            time.sleep(random.randint(3, 6))
-    return True
+            print("⚠️ Pilih hanya: y / r / x")
+
+def login_instagram():
+    print("\n🔐 LOGIN INSTAGRAM")
+    username = input("Username: ")
+    password = input("Password: ")
+    print("⏳ Login...")
+    cl = Client()
+    try:
+        cl.login(username, password)
+        print(Fore.GREEN + "✅ Login berhasil!\n")
+        return cl
+    except Exception as e:
+        print(Fore.RED + f"❌ Gagal login: {e}")
+        exit()
+
+def cek_lisensi():
+    print("🔑 CEK LISENSI")
+    lisensi = input("Masukkan kode lisensi: ")
+    if not is_license_valid(lisensi):
+        print(Fore.RED + "❌ Lisensi tidak valid.")
+        exit()
+    print(Fore.GREEN + "✅ Lisensi valid.\n")
+
+def auto_comment_loop(cl, targets, comments, dummy_mode=False):
+    sudah_dikomentari = set()
+    print(Fore.YELLOW + "\n🚀 AUTO KOMEN BERJALAN — Deteksi cepat postingan baru\n")
+
+    sudah_print_menunggu = False
+    try:
+        while True:
+            now = time.time()
+            ada_post_baru = False
+
+            for username in targets:
+                try:
+                    user_id = cl.user_id_from_username(username)
+                    medias = cl.user_medias(user_id, amount=1)
+                    if not isinstance(medias, list) or not medias:
+                        continue
+
+                    media = medias[0]
+                    media_id = media.id
+                    umur_post = now - media.taken_at.timestamp()
+
+                    if media_id in sudah_dikomentari or umur_post > 31:
+                        continue
+
+                    print(Fore.GREEN + f"✅ Postingan baru dari @{username} — umur: {int(umur_post)} detik")
+                    komentar = random.choice(comments)
+                    if dummy_mode:
+                        print(Fore.MAGENTA + f"💡 DUMMY MODE — Komentar tidak dikirim: \"{komentar}\"")
+                    else:
+                        try:
+                            cl.media_comment(media_id, komentar)
+                            print(Fore.CYAN + "💬 Komentar terkirim")
+                        except:
+                            print(Fore.RED + "❌ Gagal komentar")
+                    sudah_dikomentari.add(media_id)
+                    ada_post_baru = True
+                except:
+                    continue
+
+            if not ada_post_baru:
+                if not sudah_print_menunggu:
+                    print(Fore.YELLOW + "⏳ Menunggu postingan baru...")
+                    sudah_print_menunggu = True
+            else:
+                sudah_print_menunggu = False
+
+            jeda = random.randint(3, 6)
+            print(Fore.YELLOW + f"🕒 Jeda {jeda} detik...\n")
+            time.sleep(jeda)
+
+    except KeyboardInterrupt:
+        print(Fore.RED + "\n🛑 Dihentikan oleh pengguna.")
+        try:
+            cl.logout()
+            print(Fore.GREEN + "🔒 Logout berhasil.")
+        except:
+            print(Fore.RED + "⚠️ Gagal logout.")
+
+def menu():
+    print(Fore.CYAN + "\n==== MENU ====")
+    print("1. Jalankan auto-comment")
+    print("2. Logout Instagram")
+    print("3. Keluar")
+    return input("Pilih menu: ")
 
 def main():
     clear_terminal()
     tampilkan_banner()
+    cek_lisensi()
+    cl = login_instagram()
 
-    lisensi = input("🔑 Masukkan kode lisensi: ")
-    if not is_license_valid(lisensi):
-        print(Fore.RED + "❌ Lisensi tidak valid.")
-        sys.exit()
+    while True:
+        clear_terminal()
+        tampilkan_banner()
+        pilihan = menu()
 
-    dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
+        if pilihan == "1":
+            clear_terminal()
+            tampilkan_banner()
+            while True:
+                targets = input_list("Masukkan daftar target username (tanpa @, pisahkan dengan koma)", ",")
+                confirmed = konfirmasi(targets, "target")
+                if confirmed:
+                    break
 
-    accounts = load_accounts('Data')
-    if not accounts:
-        print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
-        return
+            while True:
+                comments = input_list("Masukkan daftar komentar (pisahkan dengan '|')", "|")
+                confirmed = konfirmasi(comments, "komentar")
+                if confirmed:
+                    break
 
-    targets = []
-    while not targets:
-        targets = input("🎯 Username target (pisah dengan koma): ").split(',')
+            dummy = input("Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
+            print(Fore.GREEN + "\n▶️ Menjalankan auto-comment...\n")
+            auto_comment_loop(cl, targets, comments, dummy_mode=dummy)
 
-    comments = []
-    while not comments:
-        comments = input("💬 Komentar (pisah dengan |): ").split('|')
+        elif pilihan == "2":
+            clear_terminal()
+            tampilkan_banner()
+            try:
+                cl.logout()
+                print(Fore.GREEN + "✅ Berhasil logout.\n")
+            except:
+                print(Fore.RED + "❌ Logout gagal.\n")
+            input("Tekan Enter untuk kembali...")
 
-    for name, path in accounts:
-        session, username = login_dengan_cookie(path)
-        if not session:
-            continue
-        sukses = auto_comment_loop(session, username, targets, comments, dummy_mode)
-        if sukses:
-            print(Fore.GREEN + "✅ Semua komentar berhasil dikirim.")
+        elif pilihan == "3":
+            print(Fore.CYAN + "\n👋 Keluar...")
             break
-    else:
-        print(Fore.RED + "❌ Semua akun gagal login atau dibatasi.")
 
-if __name__ == '__main__':
+        else:
+            print(Fore.RED + "\n❌ Pilihan tidak valid!")
+            input("Tekan Enter untuk kembali...")
+
+if __name__ == "__main__":
     main()
