@@ -1,99 +1,191 @@
+import os, sys, random, time, requests
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, FeedbackRequired, PleaseWaitFewMinutes
 from colorama import Fore, init
-import time, random, os, sys
-
-from utils.tools import clear_terminal, load_file_lines
-from utils.banner import tampilkan_banner
 from utils.license_check import is_license_valid
+from utils.tools import clear_terminal
+from utils.banner import tampilkan_banner
 
 init(autoreset=True)
 
-def input_list(prompt, separator=","):
-    print(f"{prompt} (pisahkan dengan '{separator}')")
-    return [i.strip() for i in input(">> ").split(separator) if i.strip()]
+def load_file_lines(path):
+    if not os.path.exists(path):
+        return []
+    return [line.strip() for line in open(path) if line.strip()]
 
-def konfirmasi(data):
-    print(f"{Fore.YELLOW}[?] Konfirmasi: {data}")
-    return input(f"{Fore.YELLOW}Lanjut? (y/n): ").lower() == "y"
-
-def ambil_data_postingan(cl, username):
+def cek_proxy(proxy, ua):
     try:
-        user_id = cl.user_id_from_username(username)
-        post = cl.user_medias(user_id, 1)[0]
-        return post
-    except Exception as e:
-        print(f"{Fore.RED}Gagal mengambil postingan: {e}")
-        return None
-
-def kirim_komentar(cl, media_id, komentar):
-    try:
-        cl.media_comment(media_id, komentar)
-        print(f"{Fore.CYAN}💬 Komentar terkirim")
-        return True
-    except Exception as e:
-        print(f"{Fore.RED}❌ Gagal komentar: {e}")
+        response = requests.get(
+            "https://www.instagram.com/",
+            proxies={"http": proxy, "https": proxy},
+            headers={"User-Agent": ua},
+            timeout=5
+        )
+        return response.status_code == 200
+    except:
         return False
 
-def mulai_mode_gacor(cl, target, komentar_list):
-    sudah_diproses = set()
-    print(f"{Fore.YELLOW}⏳ Menunggu postingan baru...")
+def pilih_kombinasi_valid(proxies, uas):
+    print(Fore.YELLOW + "🔍 Sedang memilih kombinasi proxy dan user-agent yang valid...")
+    total = len(proxies) * len(uas)
+    tested = 0
+
+    random.shuffle(proxies)
+    random.shuffle(uas)
+
+    for proxy in proxies:
+        for ua in uas:
+            tested += 1
+            print(Fore.CYAN + f"🔄 Menguji kombinasi ke-{tested}/{total}", end='\r')
+            if cek_proxy(proxy, ua):
+                print(Fore.GREEN + f"\n✅ Kombinasi berhasil → Proxy: {proxy}, UA: {ua[:50]}...\n")
+                return proxy, ua
+    print(Fore.RED + "\n❌ Tidak ada kombinasi proxy dan user-agent yang valid.\n")
+    return None, None
+
+def load_accounts(folder='Data'):
+    if not os.path.exists(folder):
+        return []
+    return [(n, os.path.join(folder, n)) for n in os.listdir(folder)
+            if os.path.isdir(os.path.join(folder, n))]
+
+def login_dengan_cookie(path):
+    cookie_path = os.path.join(path, 'cookie.txt')
+    user_path = os.path.join(path, 'user.txt')
+
+    if not os.path.exists(cookie_path) or not os.path.exists(user_path):
+        print(Fore.RED + f"❌ cookie.txt / user.txt tidak ditemukan di {path}")
+        return None
+
+    sessionid = open(cookie_path).read().strip()
+    username = open(user_path).read().strip()
+
+    if not sessionid or not username:
+        print(Fore.RED + f"❌ sessionid atau username kosong di {path}")
+        return None
+
+    # Load proxy & user-agent
+    proxy_files = ['Proxy.txt', 'Proxy2.txt']
+    ua_files = ['Ua.txt', 'User-agents.txt']
+    proxies, uas = [], []
+
+    for f in proxy_files:
+        proxies += load_file_lines(os.path.join(path, f))
+    for f in ua_files:
+        uas += load_file_lines(os.path.join(path, f))
+
+    proxy, ua = pilih_kombinasi_valid(proxies, uas)
+
+    print(Fore.CYAN + f"🔐 Login: {username} | Proxy: {proxy or 'None'} | UA: {ua or 'Default'}")
+
+    cl = Client()
+    try:
+        if proxy:
+            cl.set_proxy(proxy)
+        if ua:
+            cl.set_default_headers({
+                "User-Agent": ua,
+                "X-IG-App-ID": "936619743392459"
+            })
+
+        cl.login_by_sessionid(sessionid)
+        user_info = cl.account_info()
+        print(Fore.GREEN + f"✅ Login berhasil: {user_info.username}\n")
+        cl.username_login = user_info.username
+        return cl
+    except Exception as e:
+        print(Fore.RED + f"❌ Gagal login: {username} — {e}")
+        return None
+
+def auto_comment_loop(cl, targets, comments, dummy_mode=False):
+    posted = set()
+    print(Fore.YELLOW + "\n⏳ Menunggu postingan baru...\n")
+    ditampilkan = False
+
     while True:
-        post = ambil_data_postingan(cl, target)
-        if post and post.pk not in sudah_diproses:
-            usia_detik = time.time() - post.taken_at.timestamp()
-            if 30 <= usia_detik <= 31:
-                print(f"{Fore.GREEN}✅ Postingan baru ditemukan! ({target}) - Usia: {int(usia_detik)} detik")
-                komentar = random.choice(komentar_list)
-                if kirim_komentar(cl, post.pk, komentar):
-                    sudah_diproses.add(post.pk)
-            else:
-                time.sleep(1)
+        now = time.time()
+        found = False
+
+        for target in targets:
+            try:
+                uid = cl.user_id_from_username(target.strip())
+                media = cl.user_medias(uid, 1)
+                if not media:
+                    continue
+
+                m = media[0]
+                umur = now - m.taken_at.timestamp()
+                if m.id in posted or umur < 30 or umur >= 32:
+                    continue
+
+                print(Fore.GREEN + f"✅ Postingan baru dari @{target.strip()} — umur: {int(umur)} detik")
+                msg = random.choice(comments).strip()
+                if dummy_mode:
+                    print(Fore.MAGENTA + f"💡 DUMMY: Komentar tidak dikirim → \"{msg}\"")
+                else:
+                    try:
+                        cl.media_comment(m.id, msg)
+                        print(Fore.CYAN + f"💬 @{cl.username_login}: Komentar dikirim ({int(umur)}s)")
+                    except (FeedbackRequired, ChallengeRequired, PleaseWaitFewMinutes):
+                        print(Fore.RED + "🚫 Akun dibatasi. Pindah akun.")
+                        return False
+                    except Exception as e:
+                        print(Fore.RED + f"❌ Gagal komentar: {e}")
+                posted.add(m.id)
+                found = True
+            except Exception as e:
+                print(Fore.LIGHTRED_EX + f"⚠️ Gagal ambil data target @{target.strip()}: {e}")
+                continue
+
+        if not found:
+            if not ditampilkan:
+                print(Fore.YELLOW + "⏳ Menunggu postingan baru...", end="\r")
+                ditampilkan = True
+            time.sleep(0.6)
         else:
-            time.sleep(1)
+            ditampilkan = False
+            time.sleep(random.randint(3, 6))
+    return True
 
 def main():
     clear_terminal()
     tampilkan_banner()
 
-    if not is_license_valid():
-        print(f"{Fore.RED}Lisensi tidak valid.")
+    lisensi = input("🔑 Masukkan kode lisensi: ")
+    if not is_license_valid(lisensi):
+        print(Fore.RED + "❌ Lisensi tidak valid.")
         sys.exit()
 
-    akun_path = "Data"
-    akun_folders = sorted([f for f in os.listdir(akun_path) if os.path.isdir(os.path.join(akun_path, f))])
+    dummy_mode = input("🔧 Aktifkan mode dummy (komentar tidak dikirim)? (y/n): ").lower() == 'y'
 
-    for folder in akun_folders:
-        path = os.path.join(akun_path, folder)
-        cookie_file = os.path.join(path, "cookie.txt")
-        user_file = os.path.join(path, "user.txt")
+    accounts = load_accounts('Data')
+    if not accounts:
+        print(Fore.RED + "❌ Tidak ada akun di folder /Data.")
+        return
 
-        if not os.path.exists(cookie_file) or not os.path.exists(user_file):
-            print(f"{Fore.RED}❌ Lewat akun {folder}, file tidak ditemukan.")
+    targets = []
+    while not targets:
+        targets = input("🎯 Target username (pisah dengan koma): ").split(',')
+
+    comments = []
+    while not comments:
+        comments = input("💬 Komentar (pisah dengan |): ").split('|')
+
+    for name, path in accounts:
+        cl = login_dengan_cookie(path)
+        if not cl:
             continue
-
-        cl = Client()
+        sukses = auto_comment_loop(cl, targets, comments, dummy_mode)
         try:
-            with open(user_file) as f:
-                username = f.read().strip()
-            with open(cookie_file) as f:
-                cookie = f.read().strip()
-            cl.load_settings({})
-            cl.sessionid = cookie
-            cl.login_by_sessionid(cookie)
-            me = cl.account_info()
-            print(f"{Fore.GREEN}✅ Login sukses: {me.username}")
-        except Exception as e:
-            print(f"{Fore.RED}❌ Gagal login akun {folder}: {e}")
-            continue
-
-        target = input("Masukkan username target: ").strip()
-        komentar_list = input_list("Masukkan komentar")
-        if not konfirmasi(f"Target: {target} | Total komentar: {len(komentar_list)}"):
-            print("Dibatalkan.")
+            cl.logout()
+            print(Fore.GREEN + "🔒 Logout berhasil.\n")
+        except:
+            pass
+        if sukses:
+            print(Fore.GREEN + "✅ Semua komentar terkirim.")
             break
+    else:
+        print(Fore.RED + "❌ Semua akun gagal login atau dibatasi.")
 
-        mulai_mode_gacor(cl, target, komentar_list)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
